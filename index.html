@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Farman & Brother - Old Parts Dealer | Accounting</title>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 <style>
 :root{
   --orange:#FF7A1A;
@@ -107,9 +108,9 @@ body{background:var(--bg);color:var(--text);}
 .saveEntryBtn:hover{background:var(--orange-dark);}
 
 /* Tables */
-table{width:100%;border-collapse:collapse;background:var(--white);border-radius:10px;overflow:hidden;}
-table th{background:var(--orange);color:#fff;padding:10px 8px;font-size:12.5px;text-align:right;}
-table td{padding:9px 8px;border-bottom:1px solid var(--border);font-size:13px;text-align:right;}
+table{width:100%;border-collapse:collapse;background:var(--white);border-radius:10px;overflow:hidden;border:1.5px solid var(--orange-dark);}
+table th{background:var(--orange);color:#fff;padding:10px 8px;font-size:12.5px;text-align:right;border:1px solid var(--orange-dark);}
+table td{padding:9px 8px;border:1px solid var(--border);font-size:13px;text-align:right;}
 table tr:hover td{background:var(--orange-light);}
 .tblWrap{background:var(--white);border:1px solid var(--border);border-radius:12px;padding:6px;overflow-x:auto;}
 .debitTxt{color:var(--debit);font-weight:600;}
@@ -145,12 +146,45 @@ table tr:hover td{background:var(--orange-light);}
 .balPos{color:var(--credit);}
 .balNeg{color:var(--debit);}
 
+/* Print Header (company name from Settings) */
+.printHeader{display:none;}
+tfoot td{border-bottom:none;border-top:2px solid var(--orange);}
+.clickableRow{cursor:pointer;}
+
 /* Print */
 @media print{
   #sidebar, .topbar .printBtn, .noPrint{display:none !important;}
   #main{padding:0;}
   body{background:#fff;}
   .tblWrap,.card,.cards{box-shadow:none;border:1px solid #999;}
+  .printHeader{
+    display:block;text-align:center;margin-bottom:16px;padding-bottom:12px;
+    border-bottom:3px solid #000;
+  }
+  .printHeader h1{font-size:24px;color:#000;margin-bottom:4px;}
+  .printHeader .printMeta{font-size:12px;color:#333;}
+  table, table th, table td{border-color:#555 !important;}
+  table th{-webkit-print-color-adjust:exact;print-color-adjust:exact;background:var(--orange) !important;color:#fff !important;}
+}
+
+/* ---------- MOBILE RESPONSIVE ---------- */
+@media (max-width:768px){
+  #app{flex-direction:column;}
+  #sidebar{width:100%;flex-direction:row;overflow-x:auto;}
+  #sidebar .brand{padding:12px 16px;border-bottom:none;white-space:nowrap;}
+  #sidebar nav{display:flex;padding:0;flex:none;}
+  #sidebar nav button{padding:12px 14px;white-space:nowrap;justify-content:center;font-size:13px;}
+  #sidebar nav button.active{border-right:none;border-bottom:4px solid #fff;}
+  #sidebar .logoutBtn{margin:8px;flex-shrink:0;white-space:nowrap;}
+  #main{padding:16px;}
+  .topbar{flex-wrap:wrap;gap:10px;}
+  .topbar h1{font-size:18px;}
+  .cards{flex-direction:column;}
+  .card{min-width:100%;padding:16px 20px;}
+  .formGrid{grid-template-columns:1fr;}
+  .addAccBox{flex-direction:column;}
+  table th,table td{font-size:12px;padding:7px 5px;}
+  .loginCard{width:90%;padding:30px 22px;}
 }
 </style>
 </head>
@@ -185,6 +219,7 @@ table tr:hover td{background:var(--orange-light);}
     <nav>
       <button class="navBtn active" data-page="dashboard" onclick="goPage('dashboard')">🏠 Dashboard</button>
       <button class="navBtn" data-page="cashbook" onclick="goPage('cashbook')">📒 Cash Book</button>
+      <button class="navBtn" data-page="opening" onclick="goPage('opening')">🏁 Opening Balance</button>
       <button class="navBtn" data-page="accounts" onclick="goPage('accounts')">📂 Account List</button>
       <button class="navBtn" data-page="summary" onclick="goPage('summary')">📊 Summary</button>
       <button class="navBtn" data-page="recycle" onclick="goPage('recycle')">🗑️ Recycle Bin</button>
@@ -194,6 +229,11 @@ table tr:hover td{background:var(--orange-light);}
   </div>
 
   <div id="main">
+
+    <div class="printHeader">
+      <h1 id="printCompanyName"></h1>
+      <div class="printMeta" id="printMeta"></div>
+    </div>
 
     <!-- DASHBOARD -->
     <div id="page-dashboard" class="pageBox">
@@ -249,22 +289,71 @@ table tr:hover td{background:var(--orange-light);}
       <div class="tblWrap">
         <table>
           <thead><tr>
-            <th>Date</th><th>Debit A/C</th><th>Debit Amt</th><th>Debit Desc</th><th>Debit Ref</th>
+            <th>Sr#</th><th>Date</th><th>Debit A/C</th><th>Debit Amt</th><th>Debit Desc</th><th>Debit Ref</th>
             <th>Credit A/C</th><th>Credit Amt</th><th>Credit Desc</th><th>Credit Ref</th><th class="noPrint">Action</th>
           </tr></thead>
           <tbody id="cashbookTable"></tbody>
+          <tfoot id="cashbookFoot"></tfoot>
+        </table>
+      </div>
+    </div>
+
+    <!-- OPENING BALANCE -->
+    <div id="page-opening" class="pageBox hidden">
+      <div class="topbar">
+        <h1>Opening Balance</h1>
+        <button class="printBtn" onclick="window.print()">🖨️ Print</button>
+      </div>
+      <p class="noPrint" style="font-size:12.5px;color:#888;margin-bottom:14px;">
+        Yahan jo account naam likhenge, wo agar Account List mein nahi hai to khud-ba-khud naya account ban jayega, apne opening debit/credit balance ke sath.
+      </p>
+      <div class="formBox noPrint">
+        <h3 id="obFormTitle">Nayi Opening Balance Entry</h3>
+        <input type="hidden" id="editOpeningId">
+        <div class="formGrid">
+          <div class="field dateRow">
+            <label>Date</label>
+            <input type="date" id="obDate">
+          </div>
+          <div class="sideBlock debitSide">
+            <h4>DEBIT SIDE</h4>
+            <div class="field"><label>Account (naya ya purana)</label><input list="accList" id="obDebitAcc" placeholder="Account ka naam"></div>
+            <div class="field"><label>Amount</label><input type="number" id="obDebitAmt" step="0.01"></div>
+          </div>
+          <div class="sideBlock creditSide">
+            <h4>CREDIT SIDE</h4>
+            <div class="field"><label>Account (naya ya purana)</label><input list="accList" id="obCreditAcc" placeholder="Account ka naam"></div>
+            <div class="field"><label>Amount</label><input type="number" id="obCreditAmt" step="0.01"></div>
+          </div>
+          <button class="saveEntryBtn" onclick="saveOpeningEntry()">Opening Balance Save Karen</button>
+        </div>
+      </div>
+      <div class="tblWrap">
+        <table>
+          <thead><tr>
+            <th>Sr#</th><th>Date</th><th>Debit A/C</th><th>Debit Amt</th><th>Credit A/C</th><th>Credit Amt</th><th class="noPrint">Action</th>
+          </tr></thead>
+          <tbody id="openingTable"></tbody>
         </table>
       </div>
     </div>
 
     <!-- ACCOUNT LIST -->
     <div id="page-accounts" class="pageBox hidden">
-      <div class="topbar"><h1>Account List</h1></div>
+      <div class="topbar">
+        <h1>Account List</h1>
+        <button class="printBtn" onclick="window.print()">🖨️ Print</button>
+      </div>
       <div class="addAccBox noPrint">
         <input type="text" id="newAccName" placeholder="Naya account ka naam">
         <button onclick="addAccountManual()">+ Add Account</button>
       </div>
-      <div class="accGrid" id="accGrid"></div>
+      <div class="tblWrap">
+        <table>
+          <thead><tr><th>Sr#</th><th>Account Name</th><th>Debit</th><th>Credit</th><th>Balance</th><th class="noPrint">Action</th></tr></thead>
+          <tbody id="accGrid"></tbody>
+        </table>
+      </div>
     </div>
 
     <!-- ACCOUNT DETAIL -->
@@ -276,7 +365,7 @@ table tr:hover td{background:var(--orange-light);}
       <button class="backBtn noPrint" onclick="goPage('accounts')">← Wapas Account List</button>
       <div class="tblWrap">
         <table>
-          <thead><tr><th>Date</th><th>Debit</th><th>Credit</th><th>Description</th><th>Reference</th><th>Balance</th></tr></thead>
+          <thead><tr><th>Sr#</th><th>Date</th><th>Debit</th><th>Credit</th><th>Description</th><th>Reference</th><th>Balance</th></tr></thead>
           <tbody id="accDetailTable"></tbody>
         </table>
       </div>
@@ -288,10 +377,16 @@ table tr:hover td{background:var(--orange-light);}
         <h1>Summary — Sare Accounts</h1>
         <button class="printBtn" onclick="window.print()">🖨️ Print</button>
       </div>
+      <div class="cards">
+        <div class="card debit"><h3>Total Debit</h3><div class="val" id="summaryDebit">0</div></div>
+        <div class="card credit"><h3>Total Credit</h3><div class="val" id="summaryCredit">0</div></div>
+        <div class="card net"><h3>Net Balance</h3><div class="val" id="summaryNet">0</div></div>
+      </div>
       <div class="tblWrap">
         <table>
           <thead><tr><th>#</th><th>Account Name</th><th>Total Debit</th><th>Total Credit</th><th>Balance</th></tr></thead>
           <tbody id="summaryTable"></tbody>
+          <tfoot id="summaryFoot"></tfoot>
         </table>
       </div>
     </div>
@@ -339,6 +434,25 @@ table tr:hover td{background:var(--orange-light);}
         </div>
         <hr>
         <div class="field">
+          <label>Google Drive Backup Sync</label>
+          <p style="font-size:12px;color:#888;margin:6px 0 10px;">
+            Google Cloud Console se apna OAuth Client ID banayen (Google Drive API enable karke), neeche paste karen aur save karen. Yeh feature sirf https/http address par kaam karega (file ko seedha kholne par nahi).
+          </p>
+          <input type="text" id="settGoogleClientId" placeholder="Google OAuth Client ID yahan paste karen">
+          <br><br>
+          <button onclick="saveGoogleClientId()">Client ID Save Karen</button>
+        </div>
+        <div class="field">
+          <button onclick="initGoogleAuth()">🔗 Google Se Connect Karen</button>
+          <div id="driveStatus" style="font-size:12px;margin-top:8px;color:#888;"></div>
+        </div>
+        <div class="field" id="driveSyncBtns">
+          <button onclick="driveBackupUpload()">⬆️ Google Drive Par Backup Save Karen</button>
+          <button onclick="driveBackupRestore()">⬇️ Google Drive Se Restore Karen</button>
+          <div id="driveMsg" style="font-size:12px;margin-top:8px;color:var(--credit);"></div>
+        </div>
+        <hr>
+        <div class="field">
           <label>Sab Data Delete Karen (Ehtiyat se!)</label><br><br>
           <button class="dangerBtn" onclick="resetAllConfirm()">🗑️ Sab Kuch Delete Karen</button>
         </div>
@@ -355,10 +469,11 @@ const LS_KEY = 'fb_partsdealer_data_v1';
 
 function defaultData(){
   return {
-    settings: { businessName: 'Farman & Brother - Old Parts Dealer' },
+    settings: { businessName: 'Farman & Brother - Old Parts Dealer', googleClientId:'', driveFileId:null },
     auth: { passwordHash: null },
     accounts: [],   // {id, name}
     entries: [],    // {id,date,debitAccount,debitAmount,debitDesc,debitRef,creditAccount,creditAmount,creditDesc,creditRef,deleted,deletedAt}
+    openingBalances: [], // {id,date,debitAccount,debitAmount,creditAccount,creditAmount}
   };
 }
 
@@ -367,7 +482,17 @@ let DATA = loadData();
 function loadData(){
   try{
     const raw = localStorage.getItem(LS_KEY);
-    if(raw) return JSON.parse(raw);
+    if(raw){
+      const d = JSON.parse(raw);
+      if(!d.settings) d.settings = {};
+      if(d.settings.googleClientId===undefined) d.settings.googleClientId = '';
+      if(d.settings.driveFileId===undefined) d.settings.driveFileId = null;
+      if(!d.openingBalances) d.openingBalances = [];
+      if(!d.accounts) d.accounts = [];
+      if(!d.entries) d.entries = [];
+      if(!d.auth) d.auth = {passwordHash:null};
+      return d;
+    }
   }catch(e){ console.error(e); }
   return defaultData();
 }
@@ -444,7 +569,9 @@ function enterApp(){
   document.getElementById('sbBrandName').textContent = DATA.settings.businessName;
   document.title = DATA.settings.businessName + ' | Accounting';
   document.getElementById('settBusinessName').value = DATA.settings.businessName;
+  document.getElementById('settGoogleClientId').value = DATA.settings.googleClientId || '';
   renderAll();
+  updatePrintHeader();
 }
 
 /* ================= NAVIGATION ================= */
@@ -460,9 +587,24 @@ function goPage(page, accName){
     if(btn) btn.classList.add('active');
     if(page==='dashboard') renderDashboard();
     if(page==='cashbook') renderCashbook();
+    if(page==='opening') renderOpeningBalance();
     if(page==='accounts') renderAccountList();
     if(page==='summary') renderSummary();
     if(page==='recycle') renderRecycleBin();
+  }
+  updatePrintHeader();
+}
+
+/* ================= PRINT HEADER ================= */
+function updatePrintHeader(){
+  const nameEl = document.getElementById('printCompanyName');
+  if(nameEl) nameEl.textContent = DATA.settings.businessName;
+  const metaEl = document.getElementById('printMeta');
+  if(metaEl){
+    const activeH1 = document.querySelector('.pageBox:not(.hidden) .topbar h1, .pageBox:not(.hidden) h1');
+    const pageTitle = activeH1 ? activeH1.textContent : '';
+    const d = new Date();
+    metaEl.textContent = (pageTitle ? pageTitle + '  |  ' : '') + 'Print Date: ' + d.toLocaleDateString('en-GB');
   }
 }
 
@@ -495,10 +637,26 @@ function escapeHtml(s){
   return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 
+function findAccount(name){
+  name = (name||'').trim().toLowerCase();
+  if(!name) return null;
+  return DATA.accounts.find(a=>a.name.toLowerCase()===name) || null;
+}
+
 /* Compute balance summary per account: totalDebit, totalCredit, net */
 function computeAccountTotals(){
   const map = {};
   DATA.accounts.forEach(a=> map[a.name] = {debit:0, credit:0});
+  DATA.openingBalances.forEach(e=>{
+    if(e.debitAccount){
+      if(!map[e.debitAccount]) map[e.debitAccount] = {debit:0,credit:0};
+      map[e.debitAccount].debit += Number(e.debitAmount||0);
+    }
+    if(e.creditAccount){
+      if(!map[e.creditAccount]) map[e.creditAccount] = {debit:0,credit:0};
+      map[e.creditAccount].credit += Number(e.creditAmount||0);
+    }
+  });
   DATA.entries.filter(e=>!e.deleted).forEach(e=>{
     if(e.debitAccount){
       if(!map[e.debitAccount]) map[e.debitAccount] = {debit:0,credit:0};
@@ -515,8 +673,10 @@ function computeAccountTotals(){
 /* ================= DASHBOARD ================= */
 function renderDashboard(){
   const active = DATA.entries.filter(e=>!e.deleted);
-  const totalDebit = active.reduce((s,e)=>s+Number(e.debitAmount||0),0);
-  const totalCredit = active.reduce((s,e)=>s+Number(e.creditAmount||0),0);
+  let totalDebit = active.reduce((s,e)=>s+Number(e.debitAmount||0),0);
+  let totalCredit = active.reduce((s,e)=>s+Number(e.creditAmount||0),0);
+  totalDebit += DATA.openingBalances.reduce((s,e)=>s+Number(e.debitAmount||0),0);
+  totalCredit += DATA.openingBalances.reduce((s,e)=>s+Number(e.creditAmount||0),0);
   const net = totalDebit - totalCredit;
   document.getElementById('dashDebit').textContent = fmt(totalDebit);
   document.getElementById('dashCredit').textContent = fmt(totalCredit);
@@ -537,8 +697,11 @@ function renderDashboard(){
 function renderCashbook(){
   refreshAccountDatalist();
   document.getElementById('cbDate').value = document.getElementById('cbDate').value || todayStr();
-  const rows = DATA.entries.filter(e=>!e.deleted).slice().sort((a,b)=> (a.date<b.date?1:-1)).map(e=>{
+  const active = DATA.entries.filter(e=>!e.deleted).slice().sort((a,b)=> (a.date<b.date?1:-1));
+  let i=1;
+  const rows = active.map(e=>{
     return '<tr>'+
+      '<td>'+(i++)+'</td>'+
       '<td>'+e.date+'</td>'+
       '<td class="debitTxt">'+escapeHtml(e.debitAccount||'')+'</td>'+
       '<td class="debitTxt">'+fmt(e.debitAmount)+'</td>'+
@@ -554,7 +717,22 @@ function renderCashbook(){
       '</td>'+
     '</tr>';
   }).join('');
-  document.getElementById('cashbookTable').innerHTML = rows || '<tr><td colspan="10" style="text-align:center;color:#999;">Koi entry nahi</td></tr>';
+  document.getElementById('cashbookTable').innerHTML = rows || '<tr><td colspan="11" style="text-align:center;color:#999;">Koi entry nahi</td></tr>';
+
+  const foot = document.getElementById('cashbookFoot');
+  if(active.length){
+    const totalDebit = active.reduce((s,e)=>s+Number(e.debitAmount||0),0);
+    const totalCredit = active.reduce((s,e)=>s+Number(e.creditAmount||0),0);
+    foot.innerHTML = '<tr style="font-weight:700;background:var(--orange-light);">'+
+      '<td colspan="3">Total</td>'+
+      '<td class="debitTxt">'+fmt(totalDebit)+'</td>'+
+      '<td colspan="3"></td>'+
+      '<td class="creditTxt">'+fmt(totalCredit)+'</td>'+
+      '<td colspan="3"></td>'+
+    '</tr>';
+  } else {
+    foot.innerHTML = '';
+  }
 }
 
 function clearCashForm(){
@@ -573,11 +751,11 @@ function clearCashForm(){
 function saveCashEntry(){
   const id = document.getElementById('editEntryId').value;
   const date = document.getElementById('cbDate').value || todayStr();
-  const debitAccount = document.getElementById('cbDebitAcc').value.trim();
+  let debitAccount = document.getElementById('cbDebitAcc').value.trim();
   const debitAmount = parseFloat(document.getElementById('cbDebitAmt').value)||0;
   const debitDesc = document.getElementById('cbDebitDesc').value.trim();
   const debitRef = document.getElementById('cbDebitRef').value.trim();
-  const creditAccount = document.getElementById('cbCreditAcc').value.trim();
+  let creditAccount = document.getElementById('cbCreditAcc').value.trim();
   const creditAmount = parseFloat(document.getElementById('cbCreditAmt').value)||0;
   const creditDesc = document.getElementById('cbCreditDesc').value.trim();
   const creditRef = document.getElementById('cbCreditRef').value.trim();
@@ -586,8 +764,22 @@ function saveCashEntry(){
     alert('Kam az kam ek account (debit ya credit) zaroor likhen.');
     return;
   }
-  if(debitAccount) ensureAccount(debitAccount);
-  if(creditAccount) ensureAccount(creditAccount);
+  if(debitAccount){
+    const acc = findAccount(debitAccount);
+    if(!acc){
+      alert('Error: Debit Account "'+debitAccount+'" Account List mein mojood nahi hai. Pehle Account List ya Opening Balance se yeh account banayen.');
+      return;
+    }
+    debitAccount = acc.name;
+  }
+  if(creditAccount){
+    const acc = findAccount(creditAccount);
+    if(!acc){
+      alert('Error: Credit Account "'+creditAccount+'" Account List mein mojood nahi hai. Pehle Account List ya Opening Balance se yeh account banayen.');
+      return;
+    }
+    creditAccount = acc.name;
+  }
 
   if(id){
     const e = DATA.entries.find(x=>x.id===id);
@@ -634,45 +826,160 @@ function deleteEntry(id){
   renderDashboard();
 }
 
+/* ================= OPENING BALANCE ================= */
+function renderOpeningBalance(){
+  refreshAccountDatalist();
+  document.getElementById('obDate').value = document.getElementById('obDate').value || todayStr();
+  const rows = DATA.openingBalances.slice().sort((a,b)=> (a.date<b.date?1:-1));
+  let i=1;
+  document.getElementById('openingTable').innerHTML = rows.map(e=>{
+    return '<tr>'+
+      '<td>'+(i++)+'</td>'+
+      '<td>'+e.date+'</td>'+
+      '<td class="debitTxt">'+escapeHtml(e.debitAccount||'')+'</td>'+
+      '<td class="debitTxt">'+fmt(e.debitAmount)+'</td>'+
+      '<td class="creditTxt">'+escapeHtml(e.creditAccount||'')+'</td>'+
+      '<td class="creditTxt">'+fmt(e.creditAmount)+'</td>'+
+      '<td class="noPrint">'+
+        '<button class="smallBtn editBtn" onclick="editOpeningEntry(\''+e.id+'\')">Edit</button>'+
+        '<button class="smallBtn delBtn" onclick="deleteOpeningEntry(\''+e.id+'\')">Delete</button>'+
+      '</td>'+
+    '</tr>';
+  }).join('') || '<tr><td colspan="7" style="text-align:center;color:#999;">Koi opening balance nahi</td></tr>';
+}
+
+function clearOpeningForm(){
+  document.getElementById('editOpeningId').value='';
+  document.getElementById('obFormTitle').textContent='Nayi Opening Balance Entry';
+  document.getElementById('obDebitAcc').value='';
+  document.getElementById('obDebitAmt').value='';
+  document.getElementById('obCreditAcc').value='';
+  document.getElementById('obCreditAmt').value='';
+}
+
+function saveOpeningEntry(){
+  const id = document.getElementById('editOpeningId').value;
+  const date = document.getElementById('obDate').value || todayStr();
+  const debitAccount = document.getElementById('obDebitAcc').value.trim();
+  const debitAmount = parseFloat(document.getElementById('obDebitAmt').value)||0;
+  const creditAccount = document.getElementById('obCreditAcc').value.trim();
+  const creditAmount = parseFloat(document.getElementById('obCreditAmt').value)||0;
+
+  if(!debitAccount && !creditAccount){
+    alert('Kam az kam ek account (debit ya credit) zaroor likhen.');
+    return;
+  }
+  // Opening Balance entries CAN create new accounts automatically
+  if(debitAccount) ensureAccount(debitAccount);
+  if(creditAccount) ensureAccount(creditAccount);
+
+  if(id){
+    const e = DATA.openingBalances.find(x=>x.id===id);
+    if(e) Object.assign(e, {date, debitAccount, debitAmount, creditAccount, creditAmount});
+  } else {
+    DATA.openingBalances.push({id: uid(), date, debitAccount, debitAmount, creditAccount, creditAmount});
+  }
+  saveData();
+  clearOpeningForm();
+  renderOpeningBalance();
+  renderAccountList();
+  renderDashboard();
+  renderSummary();
+  refreshAccountDatalist();
+}
+
+function editOpeningEntry(id){
+  const e = DATA.openingBalances.find(x=>x.id===id);
+  if(!e) return;
+  document.getElementById('editOpeningId').value = e.id;
+  document.getElementById('obFormTitle').textContent = 'Opening Balance Edit Karen';
+  document.getElementById('obDate').value = e.date;
+  document.getElementById('obDebitAcc').value = e.debitAccount||'';
+  document.getElementById('obDebitAmt').value = e.debitAmount||'';
+  document.getElementById('obCreditAcc').value = e.creditAccount||'';
+  document.getElementById('obCreditAmt').value = e.creditAmount||'';
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+
+function deleteOpeningEntry(id){
+  if(!confirm('Yeh Opening Balance entry delete karni hai?')) return;
+  DATA.openingBalances = DATA.openingBalances.filter(x=>x.id!==id);
+  saveData();
+  renderOpeningBalance();
+  renderAccountList();
+  renderDashboard();
+  renderSummary();
+}
+
 /* ================= ACCOUNT LIST & DETAIL ================= */
 function renderAccountList(){
   const totals = computeAccountTotals();
-  const grid = document.getElementById('accGrid');
+  const tbody = document.getElementById('accGrid');
   if(DATA.accounts.length===0){
-    grid.innerHTML = '<p style="color:#999;">Koi account nahi hai. Upar se account add karen ya Cash Book se entry karen.</p>';
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#999;">Koi account nahi hai. Upar se account add karen ya Cash Book se entry karen.</td></tr>';
     return;
   }
-  grid.innerHTML = DATA.accounts.slice().sort((a,b)=>a.name.localeCompare(b.name)).map(a=>{
+  let i=1;
+  tbody.innerHTML = DATA.accounts.slice().sort((a,b)=>a.name.localeCompare(b.name)).map(a=>{
     const t = totals[a.name] || {debit:0,credit:0};
     const bal = t.debit - t.credit;
-    return '<div class="accCard" onclick="goPage(\'accountDetail\',\''+encodeURIComponent(a.name)+'\')">'+
-      '<div class="accName">'+escapeHtml(a.name)+'</div>'+
-      '<div style="font-size:12px;margin-top:6px;">Bal: '+fmt(Math.abs(bal))+(bal>=0?' Dr':' Cr')+'</div>'+
-    '</div>';
+    return '<tr class="clickableRow" onclick="goPage(\'accountDetail\',\''+encodeURIComponent(a.name)+'\')">'+
+      '<td>'+(i++)+'</td>'+
+      '<td>'+escapeHtml(a.name)+'</td>'+
+      '<td class="debitTxt">'+fmt(t.debit)+'</td>'+
+      '<td class="creditTxt">'+fmt(t.credit)+'</td>'+
+      '<td class="'+(bal>=0?'balPos':'balNeg')+'">'+fmt(Math.abs(bal))+(bal>=0?' Dr':' Cr')+'</td>'+
+      '<td class="noPrint"><button class="smallBtn delBtn" onclick="event.stopPropagation();deleteAccount(\''+encodeURIComponent(a.name)+'\')">Delete</button></td>'+
+    '</tr>';
   }).join('');
+}
+
+function deleteAccount(encName){
+  const name = decodeURIComponent(encName);
+  const hasEntries = DATA.entries.some(e=>!e.deleted && (e.debitAccount===name || e.creditAccount===name));
+  const hasOpening = DATA.openingBalances.some(e=> e.debitAccount===name || e.creditAccount===name);
+  if(hasEntries || hasOpening){
+    alert('Yeh account delete nahi ho sakta kyunke iske sath Cash Book ya Opening Balance entries mojood hain. Pehle un entries ko delete/tabdeel karen.');
+    return;
+  }
+  if(!confirm('Account "'+name+'" hamesha ke liye delete karna hai?')) return;
+  DATA.accounts = DATA.accounts.filter(a=>a.name!==name);
+  saveData();
+  renderAccountList();
+  refreshAccountDatalist();
 }
 
 function openAccountDetail(encName){
   const name = decodeURIComponent(encName);
   document.getElementById('accDetailTitle').textContent = name;
-  const rows = DATA.entries.filter(e=>!e.deleted && (e.debitAccount===name || e.creditAccount===name))
-    .slice().sort((a,b)=> a.date<b.date?-1:1);
-  let running = 0;
-  let html = '';
-  rows.forEach(e=>{
+  const obRows = DATA.openingBalances.filter(e=> e.debitAccount===name || e.creditAccount===name).map(e=>({
+    date: e.date,
+    debit: e.debitAccount===name ? Number(e.debitAmount||0) : 0,
+    credit: e.creditAccount===name ? Number(e.creditAmount||0) : 0,
+    desc: 'Opening Balance',
+    ref: ''
+  }));
+  const txRows = DATA.entries.filter(e=>!e.deleted && (e.debitAccount===name || e.creditAccount===name)).map(e=>{
     let debit=0, credit=0, desc='', ref='';
     if(e.debitAccount===name){ debit = Number(e.debitAmount||0); desc=e.debitDesc; ref=e.debitRef; }
     if(e.creditAccount===name){ credit = Number(e.creditAmount||0); desc = desc ? desc+' / '+e.creditDesc : e.creditDesc; ref = ref ? ref+' / '+e.creditRef : e.creditRef; }
-    running += debit - credit;
-    html += '<tr><td>'+e.date+'</td>'+
-      '<td class="debitTxt">'+(debit?fmt(debit):'')+'</td>'+
-      '<td class="creditTxt">'+(credit?fmt(credit):'')+'</td>'+
-      '<td>'+escapeHtml(desc||'')+'</td>'+
-      '<td>'+escapeHtml(ref||'')+'</td>'+
+    return {date:e.date, debit, credit, desc, ref};
+  });
+  const rows = obRows.concat(txRows).sort((a,b)=> a.date<b.date?-1:1);
+  let running = 0;
+  let html = '';
+  let i=1;
+  rows.forEach(r=>{
+    running += r.debit - r.credit;
+    html += '<tr><td>'+(i++)+'</td><td>'+r.date+'</td>'+
+      '<td class="debitTxt">'+(r.debit?fmt(r.debit):'')+'</td>'+
+      '<td class="creditTxt">'+(r.credit?fmt(r.credit):'')+'</td>'+
+      '<td>'+escapeHtml(r.desc||'')+'</td>'+
+      '<td>'+escapeHtml(r.ref||'')+'</td>'+
       '<td class="'+(running>=0?'balPos':'balNeg')+'">'+fmt(Math.abs(running))+(running>=0?' Dr':' Cr')+'</td>'+
     '</tr>';
   });
-  document.getElementById('accDetailTable').innerHTML = html || '<tr><td colspan="6" style="text-align:center;color:#999;">Is account mein koi entry nahi</td></tr>';
+  document.getElementById('accDetailTable').innerHTML = html || '<tr><td colspan="7" style="text-align:center;color:#999;">Is account mein koi entry nahi</td></tr>';
 }
 
 /* ================= SUMMARY ================= */
@@ -681,15 +988,31 @@ function renderSummary(){
   const names = Object.keys(totals).sort();
   let html = '';
   let i=1;
+  let sumDebit=0, sumCredit=0;
   names.forEach(name=>{
     const t = totals[name];
     const bal = t.debit - t.credit;
+    sumDebit += t.debit;
+    sumCredit += t.credit;
     html += '<tr><td>'+(i++)+'</td><td>'+escapeHtml(name)+'</td>'+
       '<td class="debitTxt">'+fmt(t.debit)+'</td>'+
       '<td class="creditTxt">'+fmt(t.credit)+'</td>'+
       '<td class="'+(bal>=0?'balPos':'balNeg')+'">'+fmt(Math.abs(bal))+(bal>=0?' Dr':' Cr')+'</td></tr>';
   });
   document.getElementById('summaryTable').innerHTML = html || '<tr><td colspan="5" style="text-align:center;color:#999;">Koi account nahi</td></tr>';
+
+  const netBal = sumDebit - sumCredit;
+  document.getElementById('summaryDebit').textContent = fmt(sumDebit);
+  document.getElementById('summaryCredit').textContent = fmt(sumCredit);
+  document.getElementById('summaryNet').textContent = fmt(Math.abs(netBal)) + (netBal>=0 ? ' (Debit)' : ' (Credit)');
+
+  const foot = document.getElementById('summaryFoot');
+  foot.innerHTML = names.length ? '<tr style="font-weight:700;background:var(--orange-light);">'+
+    '<td colspan="2">Total</td>'+
+    '<td class="debitTxt">'+fmt(sumDebit)+'</td>'+
+    '<td class="creditTxt">'+fmt(sumCredit)+'</td>'+
+    '<td class="'+(netBal>=0?'balPos':'balNeg')+'">'+fmt(Math.abs(netBal))+(netBal>=0?' Dr':' Cr')+'</td>'+
+  '</tr>' : '';
 }
 
 /* ================= RECYCLE BIN ================= */
@@ -736,10 +1059,137 @@ function saveBusinessName(){
   saveData();
   document.getElementById('sbBrandName').textContent = name;
   document.title = name + ' | Accounting';
+  updatePrintHeader();
   const msg = document.getElementById('settMsg');
   msg.textContent = 'Business naam update ho gaya.';
   setTimeout(()=>msg.textContent='', 2500);
 }
+function saveGoogleClientId(){
+  const id = document.getElementById('settGoogleClientId').value.trim();
+  DATA.settings.googleClientId = id;
+  saveData();
+  const msg = document.getElementById('settMsg');
+  msg.style.color='var(--credit)';
+  msg.textContent = 'Google Client ID save ho gaya.';
+  setTimeout(()=>msg.textContent='', 2500);
+}
+
+let gisTokenClient = null;
+let gisAccessToken = null;
+
+function initGoogleAuth(){
+  const clientId = (DATA.settings.googleClientId||'').trim();
+  const statusEl = document.getElementById('driveStatus');
+  if(!clientId){
+    statusEl.style.color = 'var(--debit)';
+    statusEl.textContent = 'Pehle upar Google Client ID save karen.';
+    return;
+  }
+  if(typeof google === 'undefined' || !google.accounts || !google.accounts.oauth2){
+    statusEl.style.color = 'var(--debit)';
+    statusEl.textContent = 'Google library load nahi hui. Internet check karen (yeh feature file:// par kaam nahi karta, https/http server par chalayen).';
+    return;
+  }
+  gisTokenClient = google.accounts.oauth2.initTokenClient({
+    client_id: clientId,
+    scope: 'https://www.googleapis.com/auth/drive.file',
+    callback: (resp)=>{
+      if(resp.error){
+        statusEl.style.color = 'var(--debit)';
+        statusEl.textContent = 'Google login mein masla: ' + resp.error;
+        return;
+      }
+      gisAccessToken = resp.access_token;
+      statusEl.style.color = 'var(--credit)';
+      statusEl.textContent = 'Google Drive se connected ✅';
+    }
+  });
+  gisTokenClient.requestAccessToken();
+}
+
+async function driveBackupUpload(){
+  const msg = document.getElementById('driveMsg');
+  if(!gisAccessToken){
+    alert('Pehle "Google Se Connect Karen" button dabayen.');
+    return;
+  }
+  msg.style.color = '#888';
+  msg.textContent = 'Upload ho raha hai...';
+  const boundary = 'fbbackupboundary' + Date.now();
+  const isUpdate = !!DATA.settings.driveFileId;
+  const content = JSON.stringify(DATA, null, 2);
+  const metadataObj = isUpdate ? {name:'FarmanBrother_Backup.json'} : {name:'FarmanBrother_Backup.json', mimeType:'application/json'};
+  const url = isUpdate
+    ? 'https://www.googleapis.com/upload/drive/v3/files/' + DATA.settings.driveFileId + '?uploadType=multipart'
+    : 'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart';
+  const body =
+    '--'+boundary+'\r\n'+
+    'Content-Type: application/json; charset=UTF-8\r\n\r\n'+
+    JSON.stringify(metadataObj) + '\r\n'+
+    '--'+boundary+'\r\n'+
+    'Content-Type: application/json\r\n\r\n'+
+    content + '\r\n'+
+    '--'+boundary+'--';
+  try{
+    const res = await fetch(url, {
+      method: isUpdate ? 'PATCH' : 'POST',
+      headers: {
+        'Authorization': 'Bearer ' + gisAccessToken,
+        'Content-Type': 'multipart/related; boundary=' + boundary
+      },
+      body
+    });
+    const data = await res.json();
+    if(data.id){
+      DATA.settings.driveFileId = data.id;
+      saveData();
+      msg.style.color = 'var(--credit)';
+      msg.textContent = 'Backup Google Drive par save ho gaya. (' + new Date().toLocaleString() + ')';
+    } else {
+      msg.style.color = 'var(--debit)';
+      msg.textContent = 'Upload mein masla hua: ' + (data.error ? data.error.message : JSON.stringify(data));
+    }
+  }catch(err){
+    msg.style.color = 'var(--debit)';
+    msg.textContent = 'Upload error: ' + err.message;
+  }
+}
+
+async function driveBackupRestore(){
+  const msg = document.getElementById('driveMsg');
+  if(!gisAccessToken){
+    alert('Pehle "Google Se Connect Karen" button dabayen.');
+    return;
+  }
+  if(!DATA.settings.driveFileId){
+    alert('Google Drive par abhi tak koi backup file nahi mili. Pehle "Backup Save Karen" se ek backup upload karen.');
+    return;
+  }
+  if(!confirm('Google Drive se restore karne par mojooda data replace ho jayega. Aage badhein?')) return;
+  msg.style.color = '#888';
+  msg.textContent = 'Restore ho raha hai...';
+  try{
+    const res = await fetch('https://www.googleapis.com/drive/v3/files/' + DATA.settings.driveFileId + '?alt=media', {
+      headers: { 'Authorization': 'Bearer ' + gisAccessToken }
+    });
+    const imported = await res.json();
+    if(!imported.entries || !imported.accounts || !imported.settings){
+      msg.style.color = 'var(--debit)';
+      msg.textContent = 'Drive par mili file valid backup nahi hai.';
+      return;
+    }
+    DATA = imported;
+    if(!DATA.auth) DATA.auth = {passwordHash:null};
+    if(!DATA.openingBalances) DATA.openingBalances = [];
+    saveData();
+    alert('Google Drive se backup restore ho gaya!');
+    location.reload();
+  }catch(err){
+    msg.style.color = 'var(--debit)';
+    msg.textContent = 'Restore error: ' + err.message;
+  }
+}
+
 function changePassword(){
   const p1 = document.getElementById('settNewPass1').value;
   const p2 = document.getElementById('settNewPass2').value;
@@ -778,6 +1228,9 @@ function importBackup(evt){
       if(!confirm('Restore karne se mojooda data replace ho jayega. Aage badhein?')) return;
       DATA = imported;
       if(!DATA.auth) DATA.auth = {passwordHash:null};
+      if(!DATA.openingBalances) DATA.openingBalances = [];
+      if(DATA.settings.googleClientId===undefined) DATA.settings.googleClientId = '';
+      if(DATA.settings.driveFileId===undefined) DATA.settings.driveFileId = null;
       saveData();
       alert('Backup restore ho gaya!');
       location.reload();
@@ -794,6 +1247,7 @@ function renderAll(){
   refreshAccountDatalist();
   renderDashboard();
   renderCashbook();
+  renderOpeningBalance();
   renderAccountList();
   renderSummary();
   renderRecycleBin();
