@@ -4,7 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Farman & Brother - Old Parts Dealer | Accounting</title>
-<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore-compat.js"></script>
 <style>
 :root{
   --orange:#FF7A1A;
@@ -42,6 +44,14 @@ body{background:var(--bg);color:var(--text);}
   border-radius:8px;font-size:15px;font-weight:600;cursor:pointer;transition:.2s;
 }
 .loginCard button:hover{background:var(--orange-dark);}
+.orDivider{display:flex;align-items:center;text-align:center;color:#aaa;font-size:12px;margin:14px 0;}
+.orDivider::before,.orDivider::after{content:'';flex:1;border-bottom:1px solid var(--border);}
+.orDivider span{padding:0 10px;}
+.googleBtn{
+  width:100%;padding:11px;background:#fff !important;color:#444 !important;border:2px solid var(--border) !important;
+  border-radius:8px;font-size:14.5px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;
+}
+.googleBtn:hover{background:#f7f7f7 !important;}
 .loginMsg{font-size:13px;margin-top:10px;min-height:16px;}
 .loginMsg.err{color:var(--debit);}
 .loginMsg.ok{color:var(--credit);}
@@ -99,7 +109,10 @@ body{background:var(--bg);color:var(--text);}
 .field input,.field select{
   width:100%;padding:9px 10px;border:1.5px solid var(--border);border-radius:7px;font-size:13.5px;outline:none;
 }
-.field input:focus{border-color:var(--orange);}
+.field textarea{
+  width:100%;padding:9px 10px;border:1.5px solid var(--border);border-radius:7px;font-size:12px;outline:none;font-family:monospace;resize:vertical;
+}
+.field input:focus,.field textarea:focus{border-color:var(--orange);}
 .dateRow{grid-column:1/-1;}
 .saveEntryBtn{
   grid-column:1/-1;background:var(--orange);color:#fff;border:none;padding:12px;
@@ -204,6 +217,17 @@ tfoot td{border-bottom:none;border-top:2px solid var(--orange);}
       <input type="password" id="loginPass" placeholder="Password" onkeydown="if(event.key==='Enter')doLogin()">
       <button onclick="doLogin()">Login</button>
       <span class="forgotLink" onclick="resetAllConfirm()">Password bhool gaye? (Sab data reset)</span>
+    </div>
+    <div id="fbLoginBlock" class="hidden">
+      <input type="email" id="fbLoginEmail" placeholder="Email" onkeydown="if(event.key==='Enter')doFirebaseLogin()">
+      <input type="password" id="fbLoginPass" placeholder="Password" onkeydown="if(event.key==='Enter')doFirebaseLogin()">
+      <button onclick="doFirebaseLogin()">Login</button>
+      <div class="orDivider"><span>ya</span></div>
+      <button class="googleBtn" onclick="doGoogleLogin()">
+        <svg width="18" height="18" viewBox="0 0 48 48" style="vertical-align:middle;margin-right:8px;"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.1 8 3l6-6C34.5 5.1 29.5 3 24 3 12.4 3 3 12.4 3 24s9.4 21 21 21 21-9.4 21-21c0-1.4-.1-2.7-.4-4z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.6 15.3 18.9 12 24 12c3.1 0 5.8 1.1 8 3l6-6C34.5 5.1 29.5 3 24 3 16.3 3 9.7 7.4 6.3 14.7z"/><path fill="#4CAF50" d="M24 45c5.4 0 10.3-2.1 14-5.5l-6.5-5.4C29.4 35.9 26.8 37 24 37c-5.3 0-9.7-3.3-11.3-8l-6.6 5.1C9.6 40.5 16.2 45 24 45z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.3-2.3 4.2-4.2 5.6l6.5 5.4C41.4 35.9 45 30.5 45 24c0-1.4-.1-2.7-.4-4z"/></svg>
+        Google Se Login Karen
+      </button>
+      <span class="forgotLink" onclick="switchToLocalMode()">Firebase mein masla? (Local mode par jayen)</span>
     </div>
     <div class="loginMsg" id="loginMsg"></div>
   </div>
@@ -414,14 +438,14 @@ tfoot td{border-bottom:none;border-top:2px solid var(--orange);}
         </div>
         <button onclick="saveBusinessName()">Naam Save Karen</button>
         <hr>
-        <div class="field">
-          <label>Password Change Karen</label>
+        <div class="field" id="localPasswordBlock">
+          <label>Password Change Karen (Local Mode)</label>
           <input type="password" id="settNewPass1" placeholder="Naya password">
           <br><br>
           <input type="password" id="settNewPass2" placeholder="Dobara likhen">
         </div>
-        <button onclick="changePassword()">Password Update Karen</button>
-        <hr>
+        <button id="localPasswordBtn" onclick="changePassword()">Password Update Karen</button>
+        <hr id="localPasswordHr">
         <div class="field">
           <label>Backup (Data Download Karen)</label><br><br>
           <button onclick="exportBackup()">⬇️ Backup Download</button>
@@ -434,22 +458,17 @@ tfoot td{border-bottom:none;border-top:2px solid var(--orange);}
         </div>
         <hr>
         <div class="field">
-          <label>Google Drive Backup Sync</label>
+          <label>Firebase Cloud Sync (Sab Mobile Real-Time Connected)</label>
           <p style="font-size:12px;color:#888;margin:6px 0 10px;">
-            Google Cloud Console se apna OAuth Client ID banayen (Google Drive API enable karke), neeche paste karen aur save karen. Yeh feature sirf https/http address par kaam karega (file ko seedha kholne par nahi).
+            Yeh feature ab code ke andar set hota hai (developer ki taraf se), Settings se kuch paste nahi karna. Neeche isका current status dikh raha hai.
           </p>
-          <input type="text" id="settGoogleClientId" placeholder="Google OAuth Client ID yahan paste karen">
-          <br><br>
-          <button onclick="saveGoogleClientId()">Client ID Save Karen</button>
+          <div id="fbStatus" style="font-size:12px;color:#888;"></div>
         </div>
-        <div class="field">
-          <button onclick="initGoogleAuth()">🔗 Google Se Connect Karen</button>
-          <div id="driveStatus" style="font-size:12px;margin-top:8px;color:#888;"></div>
+        <div class="field hidden" id="fbDisconnectBlock">
+          <button class="dangerBtn" onclick="switchToLocalMode()">🔌 Local Mode Par Jayen</button>
         </div>
-        <div class="field" id="driveSyncBtns">
-          <button onclick="driveBackupUpload()">⬆️ Google Drive Par Backup Save Karen</button>
-          <button onclick="driveBackupRestore()">⬇️ Google Drive Se Restore Karen</button>
-          <div id="driveMsg" style="font-size:12px;margin-top:8px;color:var(--credit);"></div>
+        <div class="field hidden" id="fbEnableBlock">
+          <button onclick="enableFirebaseAgain()">🔗 Firebase Dobara On Karen</button>
         </div>
         <hr>
         <div class="field">
@@ -467,9 +486,34 @@ tfoot td{border-bottom:none;border-top:2px solid var(--orange);}
 /* ================= DATA LAYER ================= */
 const LS_KEY = 'fb_partsdealer_data_v1';
 
+/* ============================================================
+   FIREBASE CONFIG — yahan apne Firebase project ka config likhen.
+   Jab tak yeh "YAHAN_" placeholders wale hain, app Local Mode mein
+   chalta rahega (jaise pehle chal raha tha). Real values daalte hi
+   Firebase Login khud-ba-khud login page par aa jayega.
+   ============================================================ */
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyAT9E6LseN81bOXbTM2npnEMYTEfqFrSRA",
+  authDomain: "fbold-59f16.firebaseapp.com",
+  projectId: "fbold-59f16",
+  storageBucket: "fbold-59f16.firebasestorage.app",
+  messagingSenderId: "10870806255",
+  appId: "1:10870806255:web:1c96c7898b666ba9676d1a"
+};
+function isFirebaseConfigured(){
+  return !!(FIREBASE_CONFIG.apiKey && FIREBASE_CONFIG.apiKey.indexOf('YAHAN') === -1);
+}
+
+/* Firebase state */
+let fbApp = null, fbAuth = null, fbDB = null;
+let isFirebaseMode = false;
+let applyingRemoteSnapshot = false;
+let firebaseSessionStarted = false;
+let unsubscribeSnapshot = null;
+
 function defaultData(){
   return {
-    settings: { businessName: 'Farman & Brother - Old Parts Dealer', googleClientId:'', driveFileId:null },
+    settings: { businessName: 'Farman & Brother - Old Parts Dealer' },
     auth: { passwordHash: null },
     accounts: [],   // {id, name}
     entries: [],    // {id,date,debitAccount,debitAmount,debitDesc,debitRef,creditAccount,creditAmount,creditDesc,creditRef,deleted,deletedAt}
@@ -485,8 +529,6 @@ function loadData(){
     if(raw){
       const d = JSON.parse(raw);
       if(!d.settings) d.settings = {};
-      if(d.settings.googleClientId===undefined) d.settings.googleClientId = '';
-      if(d.settings.driveFileId===undefined) d.settings.driveFileId = null;
       if(!d.openingBalances) d.openingBalances = [];
       if(!d.accounts) d.accounts = [];
       if(!d.entries) d.entries = [];
@@ -498,6 +540,9 @@ function loadData(){
 }
 function saveData(){
   localStorage.setItem(LS_KEY, JSON.stringify(DATA));
+  if(isFirebaseMode && fbDB && !applyingRemoteSnapshot){
+    fbDB.collection('shopdata').doc('main').set(DATA).catch(function(err){ console.error('Firebase save error', err); });
+  }
 }
 function uid(){ return 'id_' + Date.now() + '_' + Math.random().toString(36).slice(2,8); }
 function simpleHash(str){
@@ -517,6 +562,13 @@ function todayStr(){
 /* ================= LOGIN FLOW ================= */
 function initLogin(){
   document.getElementById('loginBrandName').textContent = DATA.settings.businessName;
+  if(isFirebaseMode){
+    document.getElementById('setupBlock').classList.add('hidden');
+    document.getElementById('loginBlock').classList.add('hidden');
+    document.getElementById('fbLoginBlock').classList.remove('hidden');
+    return;
+  }
+  document.getElementById('fbLoginBlock').classList.add('hidden');
   if(!DATA.auth.passwordHash){
     document.getElementById('setupBlock').classList.remove('hidden');
     document.getElementById('loginBlock').classList.add('hidden');
@@ -525,6 +577,126 @@ function initLogin(){
     document.getElementById('loginBlock').classList.remove('hidden');
   }
 }
+
+/* ---- Firebase Auth ---- */
+function doFirebaseLogin(){
+  const email = document.getElementById('fbLoginEmail').value.trim();
+  const pass = document.getElementById('fbLoginPass').value;
+  const msg = document.getElementById('loginMsg');
+  if(!email || !pass){ msg.className='loginMsg err'; msg.textContent='Email aur password likhen.'; return; }
+  if(!fbAuth){ msg.className='loginMsg err'; msg.textContent='Firebase load nahi hua. Internet check karen.'; return; }
+  msg.className='loginMsg'; msg.textContent='Login ho raha hai...';
+  fbAuth.signInWithEmailAndPassword(email, pass).catch(function(err){
+    msg.className='loginMsg err';
+    msg.textContent = 'Login mein masla: ' + (err.message || err.code);
+  });
+}
+
+function doGoogleLogin(){
+  const msg = document.getElementById('loginMsg');
+  if(!fbAuth){ msg.className='loginMsg err'; msg.textContent='Firebase load nahi hua. Internet check karen.'; return; }
+  msg.className='loginMsg'; msg.textContent='Google se login ho raha hai...';
+  const provider = new firebase.auth.GoogleAuthProvider();
+  fbAuth.signInWithPopup(provider).catch(function(err){
+    msg.className='loginMsg err';
+    if(err.code === 'auth/unauthorized-domain'){
+      msg.textContent = 'Yeh website domain Firebase mein authorize nahi hai. Firebase Console → Authentication → Settings → Authorized domains mein yeh domain add karen.';
+    } else if(err.code === 'auth/operation-not-allowed'){
+      msg.textContent = 'Google Sign-In abhi enable nahi hai. Firebase Console → Authentication → Sign-in method → Google ko enable karen.';
+    } else {
+      msg.textContent = 'Google login mein masla: ' + (err.message || err.code);
+    }
+  });
+}
+
+function switchToLocalMode(){
+  if(!confirm('Local Mode mein switch karen? (Sirf is mobile ka connection off hoga, cloud ka data mehfooz rahega)')) return;
+  localStorage.setItem('forceLocalMode','1');
+  location.reload();
+}
+function enableFirebaseAgain(){
+  localStorage.removeItem('forceLocalMode');
+  location.reload();
+}
+
+function startFirebaseSession(){
+  if(firebaseSessionStarted) return;
+  firebaseSessionStarted = true;
+  const docRef = fbDB.collection('shopdata').doc('main');
+  unsubscribeSnapshot = docRef.onSnapshot(function(snap){
+    if(snap.exists){
+      const remote = snap.data();
+      if(remote && remote.entries !== undefined){
+        applyingRemoteSnapshot = true;
+        DATA = remote;
+        if(!DATA.settings) DATA.settings = {};
+        if(!DATA.openingBalances) DATA.openingBalances = [];
+        if(!DATA.accounts) DATA.accounts = [];
+        if(!DATA.entries) DATA.entries = [];
+        if(!DATA.auth) DATA.auth = {passwordHash:null};
+        localStorage.setItem(LS_KEY, JSON.stringify(DATA));
+        if(!document.getElementById('app').classList.contains('hidden')){
+          renderAll();
+          updatePrintHeader();
+          updateSettingsUI();
+        }
+        applyingRemoteSnapshot = false;
+      }
+    } else {
+      docRef.set(DATA).catch(function(err){ console.error('Initial Firestore write error', err); });
+    }
+    if(!document.getElementById('loginScreen').classList.contains('hidden')){
+      enterApp();
+      updateSettingsUI();
+    }
+  }, function(err){
+    console.error('Snapshot error', err);
+    const msg = document.getElementById('loginMsg');
+    if(msg){ msg.className='loginMsg err'; msg.textContent = 'Firestore se connect nahi ho saka: ' + err.message; }
+  });
+}
+
+function updateSettingsUI(){
+  const localBlock = document.getElementById('localPasswordBlock');
+  const localBtn = document.getElementById('localPasswordBtn');
+  const localHr = document.getElementById('localPasswordHr');
+  const fbDisconnectBlock = document.getElementById('fbDisconnectBlock');
+  const fbEnableBlock = document.getElementById('fbEnableBlock');
+  const fbStatus = document.getElementById('fbStatus');
+  if(!localBlock) return;
+  const forcedLocal = localStorage.getItem('forceLocalMode')==='1';
+  if(isFirebaseMode){
+    localBlock.classList.add('hidden');
+    localBtn.classList.add('hidden');
+    localHr.classList.add('hidden');
+    fbDisconnectBlock.classList.remove('hidden');
+    fbEnableBlock.classList.add('hidden');
+    if(fbStatus){
+      fbStatus.style.color = 'var(--credit)';
+      const email = (fbAuth && fbAuth.currentUser) ? fbAuth.currentUser.email : '';
+      fbStatus.textContent = 'Firebase se connected ✅ (' + email + ') — sab devices real-time sync ho rahe hain.';
+    }
+  } else {
+    localBlock.classList.remove('hidden');
+    localBtn.classList.remove('hidden');
+    localHr.classList.remove('hidden');
+    fbDisconnectBlock.classList.add('hidden');
+    if(fbStatus){
+      fbStatus.style.color = '#888';
+      if(isFirebaseConfigured() && forcedLocal){
+        fbStatus.textContent = 'Firebase code mein set hai lekin abhi Local Mode force kiya gaya hai.';
+        fbEnableBlock.classList.remove('hidden');
+      } else if(!isFirebaseConfigured()){
+        fbStatus.textContent = 'Abhi Firebase config code mein nahi dala gaya — app Local Mode mein hai (data sirf is mobile tak mehdood hai).';
+        fbEnableBlock.classList.add('hidden');
+      } else {
+        fbStatus.textContent = 'Local Mode mein hai (data sirf is mobile tak mehdood hai).';
+        fbEnableBlock.classList.add('hidden');
+      }
+    }
+  }
+}
+
 function doSetupPassword(){
   const p1 = document.getElementById('setupPass1').value;
   const p2 = document.getElementById('setupPass2').value;
@@ -547,6 +719,10 @@ function doLogin(){
   }
 }
 function doLogout(){
+  if(isFirebaseMode && fbAuth){
+    fbAuth.signOut();
+    return;
+  }
   sessionStorage.removeItem('fb_logged_in');
   document.getElementById('app').classList.add('hidden');
   document.getElementById('loginScreen').classList.remove('hidden');
@@ -554,10 +730,11 @@ function doLogout(){
   initLogin();
 }
 function resetAllConfirm(){
-  if(confirm('Kya aap yaqeen se sab data delete karna chahte hain? Yeh wapas nahi aayega (agar backup nahi hai).')){
-    if(confirm('Aakhri tasdeeq: sab accounts, entries, aur password delete ho jayenge?')){
-      localStorage.removeItem(LS_KEY);
+  const cloudWarning = isFirebaseMode ? ' Yeh Firebase (sab devices/staff) ka cloud data bhi delete kar dega!' : '';
+  if(confirm('Kya aap yaqeen se sab data delete karna chahte hain? Yeh wapas nahi aayega (agar backup nahi hai).' + cloudWarning)){
+    if(confirm('Aakhri tasdeeq: sab accounts, entries delete ho jayenge?')){
       DATA = defaultData();
+      localStorage.removeItem(LS_KEY);
       saveData();
       location.reload();
     }
@@ -569,9 +746,9 @@ function enterApp(){
   document.getElementById('sbBrandName').textContent = DATA.settings.businessName;
   document.title = DATA.settings.businessName + ' | Accounting';
   document.getElementById('settBusinessName').value = DATA.settings.businessName;
-  document.getElementById('settGoogleClientId').value = DATA.settings.googleClientId || '';
   renderAll();
   updatePrintHeader();
+  updateSettingsUI();
 }
 
 /* ================= NAVIGATION ================= */
@@ -591,6 +768,7 @@ function goPage(page, accName){
     if(page==='accounts') renderAccountList();
     if(page==='summary') renderSummary();
     if(page==='recycle') renderRecycleBin();
+    if(page==='settings') updateSettingsUI();
   }
   updatePrintHeader();
 }
@@ -1064,132 +1242,6 @@ function saveBusinessName(){
   msg.textContent = 'Business naam update ho gaya.';
   setTimeout(()=>msg.textContent='', 2500);
 }
-function saveGoogleClientId(){
-  const id = document.getElementById('settGoogleClientId').value.trim();
-  DATA.settings.googleClientId = id;
-  saveData();
-  const msg = document.getElementById('settMsg');
-  msg.style.color='var(--credit)';
-  msg.textContent = 'Google Client ID save ho gaya.';
-  setTimeout(()=>msg.textContent='', 2500);
-}
-
-let gisTokenClient = null;
-let gisAccessToken = null;
-
-function initGoogleAuth(){
-  const clientId = (DATA.settings.googleClientId||'').trim();
-  const statusEl = document.getElementById('driveStatus');
-  if(!clientId){
-    statusEl.style.color = 'var(--debit)';
-    statusEl.textContent = 'Pehle upar Google Client ID save karen.';
-    return;
-  }
-  if(typeof google === 'undefined' || !google.accounts || !google.accounts.oauth2){
-    statusEl.style.color = 'var(--debit)';
-    statusEl.textContent = 'Google library load nahi hui. Internet check karen (yeh feature file:// par kaam nahi karta, https/http server par chalayen).';
-    return;
-  }
-  gisTokenClient = google.accounts.oauth2.initTokenClient({
-    client_id: clientId,
-    scope: 'https://www.googleapis.com/auth/drive.file',
-    callback: (resp)=>{
-      if(resp.error){
-        statusEl.style.color = 'var(--debit)';
-        statusEl.textContent = 'Google login mein masla: ' + resp.error;
-        return;
-      }
-      gisAccessToken = resp.access_token;
-      statusEl.style.color = 'var(--credit)';
-      statusEl.textContent = 'Google Drive se connected ✅';
-    }
-  });
-  gisTokenClient.requestAccessToken();
-}
-
-async function driveBackupUpload(){
-  const msg = document.getElementById('driveMsg');
-  if(!gisAccessToken){
-    alert('Pehle "Google Se Connect Karen" button dabayen.');
-    return;
-  }
-  msg.style.color = '#888';
-  msg.textContent = 'Upload ho raha hai...';
-  const boundary = 'fbbackupboundary' + Date.now();
-  const isUpdate = !!DATA.settings.driveFileId;
-  const content = JSON.stringify(DATA, null, 2);
-  const metadataObj = isUpdate ? {name:'FarmanBrother_Backup.json'} : {name:'FarmanBrother_Backup.json', mimeType:'application/json'};
-  const url = isUpdate
-    ? 'https://www.googleapis.com/upload/drive/v3/files/' + DATA.settings.driveFileId + '?uploadType=multipart'
-    : 'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart';
-  const body =
-    '--'+boundary+'\r\n'+
-    'Content-Type: application/json; charset=UTF-8\r\n\r\n'+
-    JSON.stringify(metadataObj) + '\r\n'+
-    '--'+boundary+'\r\n'+
-    'Content-Type: application/json\r\n\r\n'+
-    content + '\r\n'+
-    '--'+boundary+'--';
-  try{
-    const res = await fetch(url, {
-      method: isUpdate ? 'PATCH' : 'POST',
-      headers: {
-        'Authorization': 'Bearer ' + gisAccessToken,
-        'Content-Type': 'multipart/related; boundary=' + boundary
-      },
-      body
-    });
-    const data = await res.json();
-    if(data.id){
-      DATA.settings.driveFileId = data.id;
-      saveData();
-      msg.style.color = 'var(--credit)';
-      msg.textContent = 'Backup Google Drive par save ho gaya. (' + new Date().toLocaleString() + ')';
-    } else {
-      msg.style.color = 'var(--debit)';
-      msg.textContent = 'Upload mein masla hua: ' + (data.error ? data.error.message : JSON.stringify(data));
-    }
-  }catch(err){
-    msg.style.color = 'var(--debit)';
-    msg.textContent = 'Upload error: ' + err.message;
-  }
-}
-
-async function driveBackupRestore(){
-  const msg = document.getElementById('driveMsg');
-  if(!gisAccessToken){
-    alert('Pehle "Google Se Connect Karen" button dabayen.');
-    return;
-  }
-  if(!DATA.settings.driveFileId){
-    alert('Google Drive par abhi tak koi backup file nahi mili. Pehle "Backup Save Karen" se ek backup upload karen.');
-    return;
-  }
-  if(!confirm('Google Drive se restore karne par mojooda data replace ho jayega. Aage badhein?')) return;
-  msg.style.color = '#888';
-  msg.textContent = 'Restore ho raha hai...';
-  try{
-    const res = await fetch('https://www.googleapis.com/drive/v3/files/' + DATA.settings.driveFileId + '?alt=media', {
-      headers: { 'Authorization': 'Bearer ' + gisAccessToken }
-    });
-    const imported = await res.json();
-    if(!imported.entries || !imported.accounts || !imported.settings){
-      msg.style.color = 'var(--debit)';
-      msg.textContent = 'Drive par mili file valid backup nahi hai.';
-      return;
-    }
-    DATA = imported;
-    if(!DATA.auth) DATA.auth = {passwordHash:null};
-    if(!DATA.openingBalances) DATA.openingBalances = [];
-    saveData();
-    alert('Google Drive se backup restore ho gaya!');
-    location.reload();
-  }catch(err){
-    msg.style.color = 'var(--debit)';
-    msg.textContent = 'Restore error: ' + err.message;
-  }
-}
-
 function changePassword(){
   const p1 = document.getElementById('settNewPass1').value;
   const p2 = document.getElementById('settNewPass2').value;
@@ -1229,8 +1281,6 @@ function importBackup(evt){
       DATA = imported;
       if(!DATA.auth) DATA.auth = {passwordHash:null};
       if(!DATA.openingBalances) DATA.openingBalances = [];
-      if(DATA.settings.googleClientId===undefined) DATA.settings.googleClientId = '';
-      if(DATA.settings.driveFileId===undefined) DATA.settings.driveFileId = null;
       saveData();
       alert('Backup restore ho gaya!');
       location.reload();
@@ -1255,8 +1305,33 @@ function renderAll(){
 
 /* ================= INIT ================= */
 (function init(){
+  const forcedLocal = localStorage.getItem('forceLocalMode')==='1';
+  if(isFirebaseConfigured() && !forcedLocal){
+    try{
+      fbApp = firebase.initializeApp(FIREBASE_CONFIG);
+      fbAuth = firebase.auth();
+      fbDB = firebase.firestore();
+      isFirebaseMode = true;
+      fbAuth.onAuthStateChanged(function(user){
+        if(user){
+          startFirebaseSession();
+        } else {
+          if(unsubscribeSnapshot){ unsubscribeSnapshot(); unsubscribeSnapshot = null; }
+          firebaseSessionStarted = false;
+          document.getElementById('app').classList.add('hidden');
+          document.getElementById('loginScreen').classList.remove('hidden');
+          initLogin();
+        }
+      });
+    }catch(e){
+      console.error('Firebase init error', e);
+      isFirebaseMode = false;
+      const msg = document.getElementById('loginMsg');
+      if(msg){ msg.className='loginMsg err'; msg.textContent = 'Firebase config mein masla hai. Neeche se Local Mode par jayen.'; }
+    }
+  }
   initLogin();
-  if(sessionStorage.getItem('fb_logged_in')==='1' && DATA.auth.passwordHash){
+  if(!isFirebaseMode && sessionStorage.getItem('fb_logged_in')==='1' && DATA.auth.passwordHash){
     enterApp();
   }
   document.getElementById('cbDate') && (document.getElementById('cbDate').value = todayStr());
