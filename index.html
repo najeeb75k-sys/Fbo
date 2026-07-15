@@ -4,6 +4,15 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Farman & Brother - Old Parts Dealer | Accounting</title>
+
+<!-- PWA (installable app) support -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#FF7A1A">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="FB Accounting">
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore-compat.js"></script>
@@ -75,6 +84,13 @@ body{background:var(--bg);color:var(--text);}
 #sidebar nav button:hover, #sidebar nav button.active{background:rgba(255,255,255,.18);}
 #sidebar nav button.active{border-right:4px solid #fff;font-weight:700;}
 #sidebar .logoutBtn{margin:16px;padding:10px;background:var(--orange-dark);border:none;color:#fff;border-radius:8px;cursor:pointer;}
+#floatingLogoutBtn{
+  position:fixed;bottom:18px;right:18px;z-index:9999;
+  padding:12px 18px;border-radius:24px;border:none;
+  background:var(--debit);color:#fff;font-size:14px;font-weight:700;cursor:pointer;
+  box-shadow:0 3px 12px rgba(0,0,0,.3);display:flex;align-items:center;gap:6px;justify-content:center;
+}
+#floatingLogoutBtn:hover{background:#c0392b;}
 
 #main{flex:1;padding:26px 32px;overflow-x:auto;}
 .topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:22px;}
@@ -235,6 +251,7 @@ tfoot td{border-bottom:none;border-top:2px solid var(--orange);}
 
 <!-- ===================== MAIN APP ===================== -->
 <div id="app" class="hidden">
+  <button id="floatingLogoutBtn" class="noPrint" onclick="doLogout()" title="Logout">⏻ Logout</button>
   <div id="sidebar">
     <div class="brand">
       <h2 id="sbBrandName">Farman & Brother</h2>
@@ -249,6 +266,7 @@ tfoot td{border-bottom:none;border-top:2px solid var(--orange);}
       <button class="navBtn" data-page="recycle" onclick="goPage('recycle')">🗑️ Recycle Bin</button>
       <button class="navBtn" data-page="settings" onclick="goPage('settings')">⚙️ Settings</button>
     </nav>
+    <button class="logoutBtn hidden" id="installAppBtn" onclick="installApp()" style="background:var(--credit);margin-bottom:0;">📲 App Install Karen</button>
     <button class="logoutBtn" onclick="doLogout()">Logout</button>
   </div>
 
@@ -1301,6 +1319,35 @@ function renderAll(){
   renderAccountList();
   renderSummary();
   renderRecycleBin();
+}
+
+/* ================= PWA INSTALL ================= */
+let deferredInstallPrompt = null;
+window.addEventListener('beforeinstallprompt', function(e){
+  e.preventDefault();
+  deferredInstallPrompt = e;
+  const btn = document.getElementById('installAppBtn');
+  if(btn) btn.classList.remove('hidden');
+});
+function installApp(){
+  if(!deferredInstallPrompt) return;
+  deferredInstallPrompt.prompt();
+  deferredInstallPrompt.userChoice.then(function(){
+    deferredInstallPrompt = null;
+    const btn = document.getElementById('installAppBtn');
+    if(btn) btn.classList.add('hidden');
+  });
+}
+window.addEventListener('appinstalled', function(){
+  const btn = document.getElementById('installAppBtn');
+  if(btn) btn.classList.add('hidden');
+});
+if('serviceWorker' in navigator){
+  window.addEventListener('load', function(){
+    navigator.serviceWorker.register('sw.js').catch(function(err){
+      console.error('Service worker registration failed', err);
+    });
+  });
 }
 
 /* ================= INIT ================= */
