@@ -29,7 +29,6 @@
   --credit:#1E7B34;
 }
 *{box-sizing:border-box;margin:0;padding:0;font-family:'Segoe UI',Tahoma,Arial,sans-serif;}
-html,body{overflow-x:hidden;width:100%;}
 body{background:var(--bg);color:var(--text);}
 .hidden{display:none !important;}
 
@@ -200,12 +199,10 @@ tfoot td{border-bottom:none;border-top:2px solid var(--orange);}
 /* ---------- MOBILE RESPONSIVE ---------- */
 @media (max-width:768px){
   #app{flex-direction:column;}
-  #sidebar{width:100%;flex-direction:column;overflow-x:visible;}
-  #sidebar .brand{padding:10px 16px;border-bottom:1px solid rgba(255,255,255,.25);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-  #sidebar .brand h2{font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-  #sidebar .brand small{font-size:10.5px;}
-  #sidebar nav{display:flex;padding:0;flex:none;width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch;}
-  #sidebar nav button{padding:12px 14px;white-space:nowrap;justify-content:center;font-size:13px;flex-shrink:0;}
+  #sidebar{width:100%;flex-direction:row;overflow-x:auto;}
+  #sidebar .brand{padding:12px 16px;border-bottom:none;white-space:nowrap;}
+  #sidebar nav{display:flex;padding:0;flex:none;}
+  #sidebar nav button{padding:12px 14px;white-space:nowrap;justify-content:center;font-size:13px;}
   #sidebar nav button.active{border-right:none;border-bottom:4px solid #fff;}
   #sidebar .logoutBtn{margin:8px;flex-shrink:0;white-space:nowrap;}
   #main{padding:16px;}
@@ -217,15 +214,6 @@ tfoot td{border-bottom:none;border-top:2px solid var(--orange);}
   .addAccBox{flex-direction:column;}
   table th,table td{font-size:12px;padding:7px 5px;}
   .loginCard{width:90%;padding:30px 22px;}
-  .accGrid{grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;}
-  .field input,.field select,.field textarea,.loginCard input,.addAccBox input{font-size:16px;}
-  #floatingLogoutBtn{bottom:12px;right:12px;padding:10px 14px;font-size:13px;}
-}
-
-@media (max-width:420px){
-  .loginCard{padding:24px 16px;}
-  #sidebar nav button{padding:10px 10px;font-size:12px;}
-  .card .val{font-size:22px;}
 }
 </style>
 </head>
@@ -245,7 +233,6 @@ tfoot td{border-bottom:none;border-top:2px solid var(--orange);}
       <input type="password" id="loginPass" placeholder="Password" onkeydown="if(event.key==='Enter')doLogin()">
       <button onclick="doLogin()">Login</button>
       <span class="forgotLink" onclick="resetAllConfirm()">Password bhool gaye? (Sab data reset)</span>
-      <span class="forgotLink hidden" id="backToFbLink" onclick="enableFirebaseAgain()">Google/Cloud Login wapas chalu karen</span>
     </div>
     <div id="fbLoginBlock" class="hidden">
       <input type="email" id="fbLoginEmail" placeholder="Email" onkeydown="if(event.key==='Enter')doFirebaseLogin()">
@@ -600,11 +587,6 @@ function initLogin(){
     return;
   }
   document.getElementById('fbLoginBlock').classList.add('hidden');
-  const backToFbLink = document.getElementById('backToFbLink');
-  if(backToFbLink){
-    const forcedLocal = localStorage.getItem('forceLocalMode')==='1';
-    backToFbLink.classList.toggle('hidden', !(isFirebaseConfigured() && forcedLocal));
-  }
   if(!DATA.auth.passwordHash){
     document.getElementById('setupBlock').classList.remove('hidden');
     document.getElementById('loginBlock').classList.add('hidden');
@@ -628,14 +610,23 @@ function doFirebaseLogin(){
   });
 }
 
-function showGoogleLoginError(err){
+function isStandaloneApp(){
+  return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+}
+function isMobileDevice(){
+  return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+}
+function googleLoginError(err){
   const msg = document.getElementById('loginMsg');
-  if(!msg) return;
   msg.className='loginMsg err';
   if(err.code === 'auth/unauthorized-domain'){
     msg.textContent = 'Yeh website domain Firebase mein authorize nahi hai. Firebase Console → Authentication → Settings → Authorized domains mein yeh domain add karen.';
   } else if(err.code === 'auth/operation-not-allowed'){
     msg.textContent = 'Google Sign-In abhi enable nahi hai. Firebase Console → Authentication → Sign-in method → Google ko enable karen.';
+  } else if(err.code === 'auth/popup-blocked' || err.code === 'auth/popup-closed-by-user' || err.code === 'auth/cancelled-popup-request'){
+    msg.textContent = 'Popup open nahi ho saka, redirect se try kiya ja raha hai...';
+    const provider = new firebase.auth.GoogleAuthProvider();
+    fbAuth.signInWithRedirect(provider).catch(googleLoginError);
   } else {
     msg.textContent = 'Google login mein masla: ' + (err.message || err.code);
   }
@@ -645,12 +636,15 @@ function doGoogleLogin(){
   if(!fbAuth){ msg.className='loginMsg err'; msg.textContent='Firebase load nahi hua. Internet check karen.'; return; }
   msg.className='loginMsg'; msg.textContent='Google se login ho raha hai...';
   const provider = new firebase.auth.GoogleAuthProvider();
-  /* Mobile browsers (aur installed PWA/home-screen app) popups ko block ya
-     silently fail kar dete hain, isliye redirect-based login zyada reliable hai.
-     onAuthStateChanged apne aap login complete honay par app kholega. */
-  fbAuth.signInWithRedirect(provider).catch(function(err){
-    showGoogleLoginError(err);
-  });
+  /* Mobile (browser ya installed app dono) mein popup ek nayi tab kholta hai
+     aur account choose karne ke baad result wapas original tab tak nahi
+     pohanchta — isliye mobile par hamesha redirect flow use karte hain.
+     Sirf desktop browser par hi popup use hoga. */
+  if(isStandaloneApp() || isMobileDevice()){
+    fbAuth.signInWithRedirect(provider).catch(googleLoginError);
+  } else {
+    fbAuth.signInWithPopup(provider).catch(googleLoginError);
+  }
 }
 
 function switchToLocalMode(){
@@ -1385,11 +1379,8 @@ if('serviceWorker' in navigator){
       fbAuth = firebase.auth();
       fbDB = firebase.firestore();
       isFirebaseMode = true;
-      /* Redirect se wapas aane ke baad agar Google login fail hua ho
-         (e.g. domain authorize nahi, ya Google sign-in enable nahi)
-         to yahan error dikhaya jayega. */
       fbAuth.getRedirectResult().catch(function(err){
-        if(err && err.code) showGoogleLoginError(err);
+        if(err && err.code) googleLoginError(err);
       });
       fbAuth.onAuthStateChanged(function(user){
         if(user){
