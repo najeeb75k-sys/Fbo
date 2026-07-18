@@ -714,10 +714,6 @@ function startFirebaseSession(){
     } else {
       docRef.set(DATA).catch(function(err){ console.error('Initial Firestore write error', err); });
     }
-    if(!document.getElementById('loginScreen').classList.contains('hidden')){
-      enterApp();
-      updateSettingsUI();
-    }
   }, function(err){
     console.error('Snapshot error', err);
     const msg = document.getElementById('loginMsg');
@@ -1413,6 +1409,14 @@ if('serviceWorker' in navigator){
       fbAuth.onAuthStateChanged(function(user){
         if(user){
           startFirebaseSession();
+          /* Firestore snapshot ka intezar kiye baghair turant app kholte hain
+             (cached/local DATA ke sath) — is se login turant mehsoos hota hai.
+             Asal data snapshot arrive hote hi khud renderAll() se update ho
+             jayega (startFirebaseSession ke andar). */
+          if(!document.getElementById('loginScreen').classList.contains('hidden')){
+            enterApp();
+            updateSettingsUI();
+          }
         } else {
           if(unsubscribeSnapshot){ unsubscribeSnapshot(); unsubscribeSnapshot = null; }
           firebaseSessionStarted = false;
