@@ -1,4 +1,4 @@
-const CACHE_NAME = 'fb-accounting-v2';
+const CACHE_NAME = 'fb-accounting-v3';
 const FILES_TO_CACHE = [
   './index.html',
   './manifest.json',
@@ -29,11 +29,14 @@ self.addEventListener('activate', function(evt){
 });
 
 self.addEventListener('fetch', function(evt){
-  // Network-first for Firebase/API calls, cache-first for app shell
+  // Network-first for Firebase/API/Google-auth calls — never let the service
+  // worker touch these, warna installed app mein Google login slow ho jata hai.
   if(evt.request.url.indexOf('googleapis.com') !== -1 ||
      evt.request.url.indexOf('firestore') !== -1 ||
-     evt.request.url.indexOf('gstatic.com') !== -1){
-    return; // let these go straight to network (Firebase needs live connection)
+     evt.request.url.indexOf('gstatic.com') !== -1 ||
+     evt.request.url.indexOf('google.com') !== -1 ||
+     evt.request.url.indexOf('googleusercontent.com') !== -1){
+    return; // let these go straight to network (Firebase/Google auth needs live connection)
   }
 
   // Network-first for the app page itself (index.html / navigation), so future
@@ -71,3 +74,4 @@ self.addEventListener('fetch', function(evt){
     })
   );
 });
+
