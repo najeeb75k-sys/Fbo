@@ -619,6 +619,7 @@ function isStandaloneApp(){
 const GOOGLE_CLIENT_ID = "5229664040-4u2j991edtcnfjk7v8eduvuskus3tf78.apps.googleusercontent.com";
 let gsiReady = false;
 let gsiInitAttempted = false;
+let pendingGoogleLogin = false;
 
 function handleGoogleCredentialResponse(response){
   const msg = document.getElementById('loginMsg');
@@ -643,6 +644,13 @@ function initGoogleSignIn(){
     google.accounts.id.renderButton(container, {theme:'outline', size:'large', width:300});
   }
   gsiReady = true;
+  /* Agar user ne button dabaya tha jabke library abhi load ho rahi thi,
+     to ab khud-ba-khud login trigger kar dete hain — user ko dobara
+     tap ya refresh nahi karna parhta. */
+  if(pendingGoogleLogin){
+    pendingGoogleLogin = false;
+    doGoogleLogin();
+  }
 }
 
 function googleLoginError(err){
@@ -661,8 +669,9 @@ function doGoogleLogin(){
   const msg = document.getElementById('loginMsg');
   if(!fbAuth){ msg.className='loginMsg err'; msg.textContent='Firebase load nahi hua. Internet check karen.'; return; }
   if(!gsiReady){
-    msg.className='loginMsg err';
-    msg.textContent='Google Sign-In library abhi load ho rahi hai, 2 second baad dobara try karen.';
+    msg.className='loginMsg';
+    msg.textContent='Google Sign-In tayyar ho raha hai, ek second...';
+    pendingGoogleLogin = true;
     initGoogleSignIn();
     return;
   }
@@ -673,8 +682,14 @@ function doGoogleLogin(){
   if(realBtn){
     realBtn.click();
   } else {
-    msg.className='loginMsg err';
-    msg.textContent='Google button abhi tayyar nahi. Page refresh kar ke dobara try karen.';
+    // Button abhi render ho raha hai — thori dair mein khud dobara try karte hain
+    msg.className='loginMsg';
+    msg.textContent='Google Sign-In tayyar ho raha hai, ek second...';
+    setTimeout(function(){
+      const retryBtn = document.querySelector('#gsiButtonContainer div[role="button"]');
+      if(retryBtn){ retryBtn.click(); }
+      else { msg.className='loginMsg err'; msg.textContent='Internet dheema hai. Dobara "Google Se Login Karen" dabayen.'; }
+    }, 800);
   }
 }
 
