@@ -176,20 +176,22 @@ table tr:hover td{background:var(--orange-light);}
 .balPos{color:var(--credit);}
 .balNeg{color:var(--debit);}
 
-/* Summary — plain, bordered, black & bold */
-.summaryWrap{
-  background:#fff;border:1px solid #000;border-radius:0;padding:14px 16px;
-  column-count:4;column-gap:16px;column-rule:1px solid #000;
-}
+/* Summary page: print-friendly two-column account/balance list */
+.summaryListWrap{background:var(--white);border:1px solid var(--border);border-radius:12px;padding:18px 22px;}
+.summaryList{column-count:2;column-gap:34px;}
 .summaryRow{
-  display:flex;justify-content:space-between;align-items:baseline;gap:10px;
-  padding:5px 2px;border-bottom:1px solid #000;break-inside:avoid;-webkit-column-break-inside:avoid;
+  display:flex;justify-content:space-between;align-items:center;gap:10px;
+  padding:8px 4px;border-bottom:1px dashed var(--border);break-inside:avoid;page-break-inside:avoid;font-size:13.5px;
 }
-.summaryRow .sName{color:#000;font-weight:700;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.summaryRow .sBal{color:#000;font-weight:700;font-size:12.5px;white-space:nowrap;}
-.summaryEmpty{color:#999;text-align:center;padding:20px;column-span:all;}
-@media (max-width:900px){ .summaryWrap{column-count:2;} }
-@media (max-width:560px){ .summaryWrap{column-count:1;} }
+.summaryRow .accName{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.summaryRow .accBal{font-weight:700;white-space:nowrap;flex-shrink:0;}
+.summaryTotalBox{
+  margin-top:18px;border:2px solid var(--orange-dark);border-radius:10px;padding:16px 20px;
+  display:flex;justify-content:space-around;flex-wrap:wrap;gap:14px;break-inside:avoid;page-break-inside:avoid;
+}
+.summaryTotalBox .tItem{text-align:center;}
+.summaryTotalBox .tItem .tLbl{font-size:12px;color:#888;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;}
+.summaryTotalBox .tItem .tVal{font-size:18px;font-weight:700;}
 
 /* Print Header (company name from Settings) */
 .printHeader{display:none;}
@@ -201,7 +203,9 @@ tfoot td{border-bottom:none;border-top:2px solid var(--orange);}
   #sidebar, .topbar .printBtn, .noPrint{display:none !important;}
   #main{padding:0;}
   body{background:#fff;}
-  .tblWrap,.card,.cards{box-shadow:none;border:1px solid #999;}
+  .tblWrap,.card,.cards,.summaryListWrap{box-shadow:none;border:1px solid #999;}
+  .summaryList{column-count:2;}
+  .summaryTotalBox{border:2px solid #000;}
   .printHeader{
     display:block;text-align:center;margin-bottom:16px;padding-bottom:12px;
     border-bottom:3px solid #000;
@@ -210,8 +214,6 @@ tfoot td{border-bottom:none;border-top:2px solid var(--orange);}
   .printHeader .printMeta{font-size:12px;color:#333;}
   table, table th, table td{border-color:#555 !important;}
   table th{-webkit-print-color-adjust:exact;print-color-adjust:exact;background:var(--orange) !important;color:#fff !important;}
-  .summaryWrap{column-count:4 !important;border:1px solid #000 !important;}
-  .summaryRow{border-bottom:1px solid #000 !important;}
 }
 
 /* ---------- MOBILE RESPONSIVE ---------- */
@@ -305,7 +307,7 @@ tfoot td{border-bottom:none;border-top:2px solid var(--orange);}
       <div class="cards">
         <div class="card debit"><h3>Total Baqaya</h3><div class="val" id="dashDebit">0</div></div>
         <div class="card credit"><h3>Total Jama</h3><div class="val" id="dashCredit">0</div></div>
-        <div class="card net"><h3>Net Balance</h3><div class="val" id="dashNet">0</div></div>
+        <div class="card net"><h3>Balance</h3><div class="val" id="dashNet">0</div></div>
       </div>
       <div class="tblWrap">
         <table>
@@ -436,9 +438,17 @@ tfoot td{border-bottom:none;border-top:2px solid var(--orange);}
     <div id="page-summary" class="pageBox hidden">
       <div class="topbar">
         <h1>Summary — Sare Accounts</h1>
-        <button class="printBtn" onclick="window.print()">🖨️ Print</button>
+        <button class="printBtn noPrint" onclick="window.print()">🖨️ Print</button>
       </div>
-      <div class="summaryWrap" id="summaryTable"></div>
+      <div class="cards">
+        <div class="card credit"><h3>Total Jama</h3><div class="val" id="summaryCredit">0</div></div>
+        <div class="card debit"><h3>Total Baqaya</h3><div class="val" id="summaryDebit">0</div></div>
+        <div class="card net"><h3>Balance</h3><div class="val" id="summaryNet">0</div></div>
+      </div>
+      <div class="summaryListWrap">
+        <div class="summaryList" id="summaryList"></div>
+        <div class="summaryTotalBox" id="summaryTotalBox"></div>
+      </div>
     </div>
 
     <!-- RECYCLE BIN -->
@@ -952,7 +962,7 @@ function renderDashboard(){
     const t = totals[name];
     const bal = t.debit - t.credit;
     return '<tr><td>'+escapeHtml(name)+'</td><td class="debitTxt">'+fmt(t.debit)+'</td><td class="creditTxt">'+fmt(t.credit)+'</td>'+
-      '<td class="'+(bal>=0?'balPos':'balNeg')+'">'+fmt(Math.abs(bal))+(bal>=0?' Baqaya':' Jama')+'</td></tr>';
+      '<td class="'+(bal>=0?'balPos':'balNeg')+'">'+fmt(Math.abs(bal))+(bal>=0?' Dr':' Cr')+'</td></tr>';
   }).join('');
   document.getElementById('dashAccTable').innerHTML = rows || '<tr><td colspan="4" style="text-align:center;color:#999;">Koi account nahi</td></tr>';
 }
@@ -1025,7 +1035,7 @@ function saveCashEntry(){
   const creditRef = document.getElementById('cbCreditRef').value.trim();
 
   if(!debitAccount && !creditAccount){
-    alert('Kam az kam ek account (debit ya credit) zaroor likhen.');
+    alert('Kam az kam ek account (baqaya ya jama) zaroor likhen.');
     return;
   }
   if(debitAccount){
@@ -1130,7 +1140,7 @@ function saveOpeningEntry(){
   const creditAmount = parseFloat(document.getElementById('obCreditAmt').value)||0;
 
   if(!debitAccount && !creditAccount){
-    alert('Kam az kam ek account (debit ya credit) zaroor likhen.');
+    alert('Kam az kam ek account (baqaya ya jama) zaroor likhen.');
     return;
   }
   // Opening Balance entries CAN create new accounts automatically
@@ -1192,7 +1202,7 @@ function renderAccountList(){
       '<td>'+escapeHtml(a.name)+'</td>'+
       '<td class="debitTxt">'+fmt(t.debit)+'</td>'+
       '<td class="creditTxt">'+fmt(t.credit)+'</td>'+
-      '<td class="'+(bal>=0?'balPos':'balNeg')+'">'+fmt(Math.abs(bal))+(bal>=0?' Baqaya':' Jama')+'</td>'+
+      '<td class="'+(bal>=0?'balPos':'balNeg')+'">'+fmt(Math.abs(bal))+(bal>=0?' Dr':' Cr')+'</td>'+
       '<td class="noPrint"><button class="smallBtn delBtn" onclick="event.stopPropagation();deleteAccount(\''+encodeURIComponent(a.name)+'\')">Delete</button></td>'+
     '</tr>';
   }).join('');
@@ -1240,7 +1250,7 @@ function openAccountDetail(encName){
       '<td class="creditTxt">'+(r.credit?fmt(r.credit):'')+'</td>'+
       '<td>'+escapeHtml(r.desc||'')+'</td>'+
       '<td>'+escapeHtml(r.ref||'')+'</td>'+
-      '<td class="'+(running>=0?'balPos':'balNeg')+'">'+fmt(Math.abs(running))+(running>=0?' Baqaya':' Jama')+'</td>'+
+      '<td class="'+(running>=0?'balPos':'balNeg')+'">'+fmt(Math.abs(running))+(running>=0?' Dr':' Cr')+'</td>'+
     '</tr>';
   });
   document.getElementById('accDetailTable').innerHTML = html || '<tr><td colspan="7" style="text-align:center;color:#999;">Is account mein koi entry nahi</td></tr>';
@@ -1252,20 +1262,36 @@ function renderSummary(){
   const rows = Object.keys(totals).map(name=>{
     const t = totals[name];
     const bal = t.debit - t.credit; // bal>=0 => Baqaya (debit), bal<0 => Jama (credit)
-    return {name, bal};
+    return {name, debit:t.debit, credit:t.credit, bal};
   });
 
-  // Sabse upar Jama accounts - zyada jama wala sabse upar
+  // Sabse upar Credit (Jama) accounts - zyada jama wala sabse upar
   const creditAccs = rows.filter(r=>r.bal<0).sort((a,b)=> a.bal - b.bal);
-  // Neeche Baqaya accounts - zyada baqaya wala upar
+  // Neeche Debit (Baqaya) accounts - zyada baqaya wala upar
   const debitAccs = rows.filter(r=>r.bal>=0).sort((a,b)=> b.bal - a.bal);
   const sorted = creditAccs.concat(debitAccs);
 
-  const html = sorted.map(r=>
-    '<div class="summaryRow"><span class="sName">'+escapeHtml(r.name)+'</span>'+
-    '<span class="sBal">'+fmt(Math.abs(r.bal))+(r.bal>=0?' Baqaya':' Jama')+'</span></div>'
-  ).join('');
-  document.getElementById('summaryTable').innerHTML = html || '<div class="summaryEmpty">Koi account nahi</div>';
+  let html = '';
+  let sumDebit=0, sumCredit=0;
+  sorted.forEach(r=>{
+    sumDebit += r.debit;
+    sumCredit += r.credit;
+    html += '<div class="summaryRow"><span class="accName">'+escapeHtml(r.name)+'</span>'+
+      '<span class="accBal '+(r.bal>=0?'balPos':'balNeg')+'">'+fmt(Math.abs(r.bal))+(r.bal>=0?' Baqaya':' Jama')+'</span></div>';
+  });
+  document.getElementById('summaryList').innerHTML = html || '<div style="text-align:center;color:#999;padding:14px;">Koi account nahi</div>';
+
+  const netBal = sumDebit - sumCredit;
+  document.getElementById('summaryDebit').textContent = fmt(sumDebit);
+  document.getElementById('summaryCredit').textContent = fmt(sumCredit);
+  document.getElementById('summaryNet').textContent = fmt(Math.abs(netBal)) + (netBal>=0 ? ' (Baqaya)' : ' (Jama)');
+
+  const totalBox = document.getElementById('summaryTotalBox');
+  totalBox.innerHTML = sorted.length ? (
+    '<div class="tItem"><div class="tLbl">Total Jama</div><div class="tVal creditTxt">'+fmt(sumCredit)+'</div></div>'+
+    '<div class="tItem"><div class="tLbl">Total Baqaya</div><div class="tVal debitTxt">'+fmt(sumDebit)+'</div></div>'+
+    '<div class="tItem"><div class="tLbl">Balance</div><div class="tVal '+(netBal>=0?'balPos':'balNeg')+'">'+fmt(Math.abs(netBal))+(netBal>=0?' Baqaya':' Jama')+'</div></div>'
+  ) : '';
 }
 
 /* ================= RECYCLE BIN ================= */
