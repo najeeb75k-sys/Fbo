@@ -214,6 +214,14 @@ tfoot td{border-bottom:none;border-top:2px solid var(--orange);}
   .printHeader .printMeta{font-size:12px;color:#333;}
   table, table th, table td{border-color:#555 !important;}
   table th{-webkit-print-color-adjust:exact;print-color-adjust:exact;background:var(--orange) !important;color:#fff !important;}
+
+  /* Summary page: print-only cleanup */
+  #page-summary .topbar, #page-summary .cards{display:none !important;}
+  #page-summary .summaryList{column-rule:1px solid #000;}
+  #page-summary .summaryRow{
+    border:1px solid #000;border-bottom:1px solid #000;border-radius:4px;
+    margin-bottom:5px;padding:7px 9px;font-weight:700;
+  }
 }
 
 /* ---------- MOBILE RESPONSIVE ---------- */
