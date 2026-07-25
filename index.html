@@ -148,6 +148,7 @@ table tr:hover td{background:var(--orange-light);}
 .smallBtn{border:none;padding:6px 10px;border-radius:6px;font-size:12px;cursor:pointer;margin-left:4px;}
 .editBtn{background:#FFE7D1;color:var(--orange-dark);}
 .delBtn{background:#FADBD8;color:var(--debit);}
+.editBtn{background:#D6EAF8;color:#1B6FA8;}
 .restoreBtn{background:#D5F5E3;color:var(--credit);}
 .permBtn{background:#F5B7B1;color:#7B241C;}
 
@@ -173,8 +174,8 @@ table tr:hover td{background:var(--orange-light);}
 .settingsBox hr{border:none;border-top:1px solid var(--border);margin:20px 0;}
 .fileLbl{display:inline-block;background:var(--orange-light);color:var(--orange-dark);padding:9px 16px;border-radius:8px;cursor:pointer;font-size:13px;}
 
-.balPos{color:var(--credit);}
-.balNeg{color:var(--debit);}
+.balPos{color:var(--debit);}
+.balNeg{color:var(--credit);}
 
 /* Summary page: print-friendly two-column account/balance list */
 .summaryListWrap{background:var(--white);border:1px solid var(--border);border-radius:12px;padding:18px 22px;}
@@ -185,6 +186,12 @@ table tr:hover td{background:var(--orange-light);}
 }
 .summaryRow .accName{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .summaryRow .accBal{font-weight:700;white-space:nowrap;flex-shrink:0;}
+.summarySectionHead{
+  font-weight:700;font-size:13px;text-transform:uppercase;letter-spacing:.4px;
+  padding:8px 4px 6px;break-inside:avoid;page-break-inside:avoid;
+}
+.summarySectionHead.jamaHead{color:var(--credit);}
+.summarySectionHead.baqayaHead{color:var(--debit);border-top:2px solid var(--border);margin-top:10px;padding-top:16px;}
 .summaryTotalBox{
   margin-top:18px;border:2px solid var(--orange-dark);border-radius:10px;padding:16px 20px;
   display:flex;justify-content:space-around;flex-wrap:wrap;gap:14px;break-inside:avoid;page-break-inside:avoid;
@@ -215,9 +222,16 @@ tfoot td{border-bottom:none;border-top:2px solid var(--orange);}
   table, table th, table td{border-color:#555 !important;}
   table th{-webkit-print-color-adjust:exact;print-color-adjust:exact;background:var(--orange) !important;color:#fff !important;}
 
+  /* Account Detail (ledger statement) print: simple black & white, no colors */
+  #page-accountDetail table th{background:#444 !important;color:#fff !important;}
+  #page-accountDetail td, #page-accountDetail td.debitTxt, #page-accountDetail td.creditTxt,
+  #page-accountDetail td.balPos, #page-accountDetail td.balNeg{color:#000 !important;font-weight:400 !important;}
+
   /* Summary page: print-only cleanup */
   #page-summary .topbar, #page-summary .cards{display:none !important;}
   #page-summary .summaryList{column-rule:1px solid #000;}
+  #page-summary .summarySectionHead{-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+  #page-summary .summarySectionHead.baqayaHead{border-top:2px solid #000;}
   #page-summary .summaryRow{
     border:1px solid #000;border-bottom:1px solid #000;border-radius:4px;
     margin-bottom:5px;padding:7px 9px;font-weight:700;
@@ -1211,9 +1225,35 @@ function renderAccountList(){
       '<td class="debitTxt">'+fmt(t.debit)+'</td>'+
       '<td class="creditTxt">'+fmt(t.credit)+'</td>'+
       '<td class="'+(bal>=0?'balPos':'balNeg')+'">'+fmt(Math.abs(bal))+(bal>=0?' Dr':' Cr')+'</td>'+
-      '<td class="noPrint"><button class="smallBtn delBtn" onclick="event.stopPropagation();deleteAccount(\''+encodeURIComponent(a.name)+'\')">Delete</button></td>'+
+      '<td class="noPrint"><button class="smallBtn editBtn" onclick="event.stopPropagation();editAccount(\''+encodeURIComponent(a.name)+'\')">Edit</button><button class="smallBtn delBtn" onclick="event.stopPropagation();deleteAccount(\''+encodeURIComponent(a.name)+'\')">Delete</button></td>'+
     '</tr>';
   }).join('');
+}
+
+function editAccount(encName){
+  const oldName = decodeURIComponent(encName);
+  const input = prompt('Account ka naya naam likhen:', oldName);
+  if(input===null) return;
+  const newName = input.trim();
+  if(!newName){ alert('Account name khali nahi ho sakta.'); return; }
+  if(newName===oldName) return;
+  if(DATA.accounts.some(a=>a.name.toLowerCase()===newName.toLowerCase())){
+    alert('Is naam ka account pehle se mojood hai.');
+    return;
+  }
+  const acc = DATA.accounts.find(a=>a.name===oldName);
+  if(acc) acc.name = newName;
+  DATA.entries.forEach(e=>{
+    if(e.debitAccount===oldName) e.debitAccount = newName;
+    if(e.creditAccount===oldName) e.creditAccount = newName;
+  });
+  DATA.openingBalances.forEach(e=>{
+    if(e.debitAccount===oldName) e.debitAccount = newName;
+    if(e.creditAccount===oldName) e.creditAccount = newName;
+  });
+  saveData();
+  renderAccountList();
+  refreshAccountDatalist();
 }
 
 function deleteAccount(encName){
@@ -1273,21 +1313,31 @@ function renderSummary(){
     return {name, debit:t.debit, credit:t.credit, bal};
   });
 
+  // Zero-balance accounts summary list mein show nahi honge
   // Sabse upar Credit (Jama) accounts - zyada jama wala sabse upar
   const creditAccs = rows.filter(r=>r.bal<0).sort((a,b)=> a.bal - b.bal);
   // Neeche Debit (Baqaya) accounts - zyada baqaya wala upar
-  const debitAccs = rows.filter(r=>r.bal>=0).sort((a,b)=> b.bal - a.bal);
-  const sorted = creditAccs.concat(debitAccs);
+  const debitAccs = rows.filter(r=>r.bal>0).sort((a,b)=> b.bal - a.bal);
 
   let html = '';
-  let sumDebit=0, sumCredit=0;
-  sorted.forEach(r=>{
-    sumDebit += r.debit;
-    sumCredit += r.credit;
-    html += '<div class="summaryRow"><span class="accName">'+escapeHtml(r.name)+'</span>'+
-      '<span class="accBal '+(r.bal>=0?'balPos':'balNeg')+'">'+fmt(Math.abs(r.bal))+(r.bal>=0?' Baqaya':' Jama')+'</span></div>';
-  });
+  if(creditAccs.length){
+    html += '<div class="summarySectionHead jamaHead">Jama Accounts</div>';
+    creditAccs.forEach(r=>{
+      html += '<div class="summaryRow"><span class="accName">'+escapeHtml(r.name)+'</span>'+
+        '<span class="accBal balNeg">'+fmt(Math.abs(r.bal))+' Jama</span></div>';
+    });
+  }
+  if(debitAccs.length){
+    html += '<div class="summarySectionHead baqayaHead">Baqaya Accounts</div>';
+    debitAccs.forEach(r=>{
+      html += '<div class="summaryRow"><span class="accName">'+escapeHtml(r.name)+'</span>'+
+        '<span class="accBal balPos">'+fmt(Math.abs(r.bal))+' Baqaya</span></div>';
+    });
+  }
   document.getElementById('summaryList').innerHTML = html || '<div style="text-align:center;color:#999;padding:14px;">Koi account nahi</div>';
+
+  let sumDebit=0, sumCredit=0;
+  rows.forEach(r=>{ sumDebit += r.debit; sumCredit += r.credit; });
 
   const netBal = sumDebit - sumCredit;
   document.getElementById('summaryDebit').textContent = fmt(sumDebit);
@@ -1295,7 +1345,7 @@ function renderSummary(){
   document.getElementById('summaryNet').textContent = fmt(Math.abs(netBal)) + (netBal>=0 ? ' (Baqaya)' : ' (Jama)');
 
   const totalBox = document.getElementById('summaryTotalBox');
-  totalBox.innerHTML = sorted.length ? (
+  totalBox.innerHTML = rows.length ? (
     '<div class="tItem"><div class="tLbl">Total Jama</div><div class="tVal creditTxt">'+fmt(sumCredit)+'</div></div>'+
     '<div class="tItem"><div class="tLbl">Total Baqaya</div><div class="tVal debitTxt">'+fmt(sumDebit)+'</div></div>'+
     '<div class="tItem"><div class="tLbl">Balance</div><div class="tVal '+(netBal>=0?'balPos':'balNeg')+'">'+fmt(Math.abs(netBal))+(netBal>=0?' Baqaya':' Jama')+'</div></div>'
