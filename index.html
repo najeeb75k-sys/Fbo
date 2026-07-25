@@ -192,7 +192,7 @@ table tr:hover td{background:var(--orange-light);}
 }
 .summarySectionHead.jamaHead{color:var(--credit);border-top:2px solid var(--border);margin-top:10px;padding-top:16px;}
 .summarySectionHead.baqayaHead{color:var(--debit);border-top:2px solid var(--border);margin-top:10px;padding-top:16px;}
-.summarySectionHead.personalHead{color:#6c5ce7;}
+.summarySectionHead.personalHead{color:#6c5ce7;border-top:2px solid var(--border);margin-top:10px;padding-top:16px;}
 .summaryList>.summarySectionHead:first-child{border-top:none;margin-top:0;padding-top:0;}
 .summaryRow.sectionTotal{border-top:2px solid var(--border);border-bottom:none;margin-top:2px;padding-top:9px;break-inside:avoid;page-break-inside:avoid;}
 .summaryRow.sectionTotal .accName{text-transform:uppercase;font-size:12px;letter-spacing:.4px;font-weight:700;}
@@ -246,6 +246,7 @@ tfoot td{border-bottom:none;border-top:2px solid var(--orange);}
   #page-summary .summarySectionHead{-webkit-print-color-adjust:exact;print-color-adjust:exact;}
   #page-summary .summarySectionHead.jamaHead{border-top:2px solid #000;}
   #page-summary .summarySectionHead.baqayaHead{border-top:2px solid #000;}
+  #page-summary .summarySectionHead.personalHead{border-top:2px solid #000;}
   #page-summary .summaryList>.summarySectionHead:first-child{border-top:none;}
   #page-summary .summaryRow{
     border:1px solid #000;border-bottom:1px solid #000;border-radius:4px;
@@ -991,18 +992,28 @@ function computeAccountTotals(){
   return map;
 }
 
+/* Total Jama / Total Baqaya / Balance - hamesha ACCOUNT ke net balance se nikalte hain,
+   har entry ke debit/credit ko seperately jama karke nahi. Isi function ko Dashboard,
+   Summary page aur Print sab jagah use karo taake sab jagah number match ho. */
+function computeBalanceTotals(){
+  const totals = computeAccountTotals();
+  let totalJama = 0, totalBaqaya = 0;
+  Object.keys(totals).forEach(name=>{
+    const t = totals[name];
+    const bal = t.debit - t.credit;
+    if(bal > 0) totalBaqaya += bal;
+    else if(bal < 0) totalJama += Math.abs(bal);
+  });
+  return { totalJama, totalBaqaya, balance: totalBaqaya - totalJama };
+}
+
 /* ================= DASHBOARD ================= */
 function renderDashboard(){
-  const active = DATA.entries.filter(e=>!e.deleted);
-  let totalDebit = active.reduce((s,e)=>s+Number(e.debitAmount||0),0);
-  let totalCredit = active.reduce((s,e)=>s+Number(e.creditAmount||0),0);
-  totalDebit += DATA.openingBalances.reduce((s,e)=>s+Number(e.debitAmount||0),0);
-  totalCredit += DATA.openingBalances.reduce((s,e)=>s+Number(e.creditAmount||0),0);
-  const net = totalDebit - totalCredit;
-  document.getElementById('dashDebit').textContent = fmt(totalDebit);
-  document.getElementById('dashCredit').textContent = fmt(totalCredit);
+  const { totalJama, totalBaqaya, balance } = computeBalanceTotals();
+  document.getElementById('dashDebit').textContent = fmt(totalBaqaya);
+  document.getElementById('dashCredit').textContent = fmt(totalJama);
   const netEl = document.getElementById('dashNet');
-  netEl.textContent = fmt(Math.abs(net)) + (net>=0 ? ' (Baqaya)' : ' (Jama)');
+  netEl.textContent = fmt(Math.abs(balance)) + (balance>=0 ? ' (Baqaya)' : ' (Jama)');
 
   const totals = computeAccountTotals();
   const rows = Object.keys(totals).sort().map(name=>{
@@ -1381,17 +1392,6 @@ function renderSummary(){
   const debitAccs = rows.filter(r=>r.bal>0 && !personalNames.has(r.name)).sort((a,b)=> b.bal - a.bal);
 
   let html = '';
-  if(personalAccs.length){
-    html += '<div class="summarySectionHead personalHead">Personal Accounts</div>';
-    let personalTotal = 0;
-    personalAccs.forEach(r=>{
-      personalTotal += r.bal;
-      html += '<div class="summaryRow"><span class="accName">'+escapeHtml(r.name)+'</span>'+
-        '<span class="accBal '+(r.bal>=0?'balPos':'balNeg')+'">'+fmt(Math.abs(r.bal))+(r.bal>=0?' Baqaya':' Jama')+'</span></div>';
-    });
-    html += '<div class="summaryRow sectionTotal"><span class="accName">Personal Total</span>'+
-      '<span class="accBal '+(personalTotal>=0?'balPos':'balNeg')+'">'+fmt(Math.abs(personalTotal))+(personalTotal>=0?' Baqaya':' Jama')+'</span></div>';
-  }
   if(creditAccs.length){
     html += '<div class="summarySectionHead jamaHead">Jama Accounts</div>';
     let jamaTotal = 0;
@@ -1402,6 +1402,17 @@ function renderSummary(){
     });
     html += '<div class="summaryRow sectionTotal"><span class="accName">Jama Total</span>'+
       '<span class="accBal balNeg">'+fmt(Math.abs(jamaTotal))+' Jama</span></div>';
+  }
+  if(personalAccs.length){
+    html += '<div class="summarySectionHead personalHead">Personal Accounts</div>';
+    let personalTotal = 0;
+    personalAccs.forEach(r=>{
+      personalTotal += r.bal;
+      html += '<div class="summaryRow"><span class="accName">'+escapeHtml(r.name)+'</span>'+
+        '<span class="accBal '+(r.bal>=0?'balPos':'balNeg')+'">'+fmt(Math.abs(r.bal))+(r.bal>=0?' Baqaya':' Jama')+'</span></div>';
+    });
+    html += '<div class="summaryRow sectionTotal"><span class="accName">Personal Total</span>'+
+      '<span class="accBal '+(personalTotal>=0?'balPos':'balNeg')+'">'+fmt(Math.abs(personalTotal))+(personalTotal>=0?' Baqaya':' Jama')+'</span></div>';
   }
   if(debitAccs.length){
     html += '<div class="summarySectionHead baqayaHead">Baqaya Accounts</div>';
@@ -1416,19 +1427,17 @@ function renderSummary(){
   }
   document.getElementById('summaryList').innerHTML = html || '<div style="text-align:center;color:#999;padding:14px;">Koi account nahi</div>';
 
-  let sumDebit=0, sumCredit=0;
-  rows.forEach(r=>{ sumDebit += r.debit; sumCredit += r.credit; });
-
-  const netBal = sumDebit - sumCredit;
-  document.getElementById('summaryDebit').textContent = fmt(sumDebit);
-  document.getElementById('summaryCredit').textContent = fmt(sumCredit);
-  document.getElementById('summaryNet').textContent = fmt(Math.abs(netBal)) + (netBal>=0 ? ' (Baqaya)' : ' (Jama)');
+  // Total Jama / Total Baqaya / Balance - account ke net balance se (har entry se nahi)
+  const { totalJama, totalBaqaya, balance } = computeBalanceTotals();
+  document.getElementById('summaryDebit').textContent = fmt(totalBaqaya);
+  document.getElementById('summaryCredit').textContent = fmt(totalJama);
+  document.getElementById('summaryNet').textContent = fmt(Math.abs(balance)) + (balance>=0 ? ' (Baqaya)' : ' (Jama)');
 
   const totalBox = document.getElementById('summaryTotalBox');
   totalBox.innerHTML = rows.length ? (
-    '<div class="tItem"><div class="tLbl">Total Jama</div><div class="tVal creditTxt">'+fmt(sumCredit)+'</div></div>'+
-    '<div class="tItem"><div class="tLbl">Total Baqaya</div><div class="tVal debitTxt">'+fmt(sumDebit)+'</div></div>'+
-    '<div class="tItem"><div class="tLbl">Balance</div><div class="tVal '+(netBal>=0?'balPos':'balNeg')+'">'+fmt(Math.abs(netBal))+(netBal>=0?' Baqaya':' Jama')+'</div></div>'
+    '<div class="tItem"><div class="tLbl">Total Jama</div><div class="tVal creditTxt">'+fmt(totalJama)+'</div></div>'+
+    '<div class="tItem"><div class="tLbl">Total Baqaya</div><div class="tVal debitTxt">'+fmt(totalBaqaya)+'</div></div>'+
+    '<div class="tItem"><div class="tLbl">Balance</div><div class="tVal '+(balance>=0?'balPos':'balNeg')+'">'+fmt(Math.abs(balance))+(balance>=0?' Baqaya':' Jama')+'</div></div>'
   ) : '';
 }
 
