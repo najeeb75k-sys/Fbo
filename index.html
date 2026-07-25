@@ -190,8 +190,18 @@ table tr:hover td{background:var(--orange-light);}
   font-weight:700;font-size:13px;text-transform:uppercase;letter-spacing:.4px;
   padding:8px 4px 6px;break-inside:avoid;page-break-inside:avoid;
 }
-.summarySectionHead.jamaHead{color:var(--credit);}
+.summarySectionHead.jamaHead{color:var(--credit);border-top:2px solid var(--border);margin-top:10px;padding-top:16px;}
 .summarySectionHead.baqayaHead{color:var(--debit);border-top:2px solid var(--border);margin-top:10px;padding-top:16px;}
+.summarySectionHead.personalHead{color:#6c5ce7;}
+.summaryList>.summarySectionHead:first-child{border-top:none;margin-top:0;padding-top:0;}
+
+.personalAccBox{margin-bottom:16px;}
+.personalPicker{
+  margin-top:10px;background:var(--white);border:1.5px solid var(--border);border-radius:10px;
+  padding:14px 16px;display:flex;flex-wrap:wrap;gap:8px 18px;max-height:260px;overflow-y:auto;
+}
+.personalPickItem{display:flex;align-items:center;gap:6px;font-size:13.5px;cursor:pointer;}
+.personalPickItem input{cursor:pointer;}
 .summaryTotalBox{
   margin-top:18px;border:2px solid var(--orange-dark);border-radius:10px;padding:16px 20px;
   display:flex;justify-content:space-around;flex-wrap:wrap;gap:14px;break-inside:avoid;page-break-inside:avoid;
@@ -231,7 +241,9 @@ tfoot td{border-bottom:none;border-top:2px solid var(--orange);}
   #page-summary .topbar, #page-summary .cards{display:none !important;}
   #page-summary .summaryList{column-rule:1px solid #000;}
   #page-summary .summarySectionHead{-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+  #page-summary .summarySectionHead.jamaHead{border-top:2px solid #000;}
   #page-summary .summarySectionHead.baqayaHead{border-top:2px solid #000;}
+  #page-summary .summaryList>.summarySectionHead:first-child{border-top:none;}
   #page-summary .summaryRow{
     border:1px solid #000;border-bottom:1px solid #000;border-radius:4px;
     margin-bottom:5px;padding:7px 9px;font-weight:700;
@@ -433,6 +445,9 @@ tfoot td{border-bottom:none;border-top:2px solid var(--orange);}
         <input type="text" id="newAccName" placeholder="Naya account ka naam">
         <button onclick="addAccountManual()">+ Add Account</button>
       </div>
+      <div class="addAccBox noPrint">
+        <input type="text" id="accSearchInput" placeholder="🔍 Account search karen..." oninput="renderAccountList()">
+      </div>
       <div class="tblWrap">
         <table>
           <thead><tr><th>Sr#</th><th>Account Name</th><th>Baqaya</th><th>Jama</th><th>Balance</th><th class="noPrint">Action</th></tr></thead>
@@ -466,6 +481,10 @@ tfoot td{border-bottom:none;border-top:2px solid var(--orange);}
         <div class="card credit"><h3>Total Jama</h3><div class="val" id="summaryCredit">0</div></div>
         <div class="card debit"><h3>Total Baqaya</h3><div class="val" id="summaryDebit">0</div></div>
         <div class="card net"><h3>Balance</h3><div class="val" id="summaryNet">0</div></div>
+      </div>
+      <div class="personalAccBox noPrint">
+        <button class="printBtn" style="background:#6c5ce7;" onclick="togglePersonalPicker()">👤 Personal Accounts Select Karen</button>
+        <div id="personalPicker" class="personalPicker hidden"></div>
       </div>
       <div class="summaryListWrap">
         <div class="summaryList" id="summaryList"></div>
@@ -573,7 +592,7 @@ function defaultData(){
   return {
     settings: { businessName: 'Farman & Brother - Old Parts Dealer' },
     auth: { passwordHash: null },
-    accounts: [],   // {id, name}
+    accounts: [],   // {id, name, personal:true/false}
     entries: [],    // {id,date,debitAccount,debitAmount,debitDesc,debitRef,creditAccount,creditAmount,creditDesc,creditRef,deleted,deletedAt}
     openingBalances: [], // {id,date,debitAccount,debitAmount,creditAccount,creditAmount}
   };
@@ -1211,12 +1230,20 @@ function deleteOpeningEntry(id){
 function renderAccountList(){
   const totals = computeAccountTotals();
   const tbody = document.getElementById('accGrid');
+  const searchEl = document.getElementById('accSearchInput');
+  const q = (searchEl ? searchEl.value : '').trim().toLowerCase();
   if(DATA.accounts.length===0){
     tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#999;">Koi account nahi hai. Upar se account add karen ya Cash Book se entry karen.</td></tr>';
     return;
   }
+  let list = DATA.accounts.slice().sort((a,b)=>a.name.localeCompare(b.name));
+  if(q) list = list.filter(a=> a.name.toLowerCase().includes(q));
+  if(list.length===0){
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#999;">Is naam se koi account nahi mila.</td></tr>';
+    return;
+  }
   let i=1;
-  tbody.innerHTML = DATA.accounts.slice().sort((a,b)=>a.name.localeCompare(b.name)).map(a=>{
+  tbody.innerHTML = list.map(a=>{
     const t = totals[a.name] || {debit:0,credit:0};
     const bal = t.debit - t.credit;
     return '<tr class="clickableRow" onclick="goPage(\'accountDetail\',\''+encodeURIComponent(a.name)+'\')">'+
@@ -1304,6 +1331,29 @@ function openAccountDetail(encName){
   document.getElementById('accDetailTable').innerHTML = html || '<tr><td colspan="7" style="text-align:center;color:#999;">Is account mein koi entry nahi</td></tr>';
 }
 
+/* ================= PERSONAL ACCOUNTS PICKER ================= */
+function togglePersonalPicker(){
+  const el = document.getElementById('personalPicker');
+  el.classList.toggle('hidden');
+  if(!el.classList.contains('hidden')) renderPersonalPicker();
+}
+function renderPersonalPicker(){
+  const el = document.getElementById('personalPicker');
+  if(DATA.accounts.length===0){
+    el.innerHTML = '<div style="color:#999;">Koi account nahi hai.</div>';
+    return;
+  }
+  el.innerHTML = DATA.accounts.slice().sort((a,b)=>a.name.localeCompare(b.name)).map(a=>{
+    return '<label class="personalPickItem"><input type="checkbox" '+(a.personal?'checked':'')+
+      ' onchange="togglePersonalAccount(\''+encodeURIComponent(a.name)+'\', this.checked)"> '+escapeHtml(a.name)+'</label>';
+  }).join('');
+}
+function togglePersonalAccount(encName, checked){
+  const name = decodeURIComponent(encName);
+  const acc = DATA.accounts.find(a=>a.name===name);
+  if(acc){ acc.personal = checked; saveData(); renderSummary(); }
+}
+
 /* ================= SUMMARY ================= */
 function renderSummary(){
   const totals = computeAccountTotals();
@@ -1313,13 +1363,24 @@ function renderSummary(){
     return {name, debit:t.debit, credit:t.credit, bal};
   });
 
+  // Personal Accounts (user-selected) sabse upar, phir baqi Jama/Baqaya sections mein
+  const personalNames = new Set(DATA.accounts.filter(a=>a.personal).map(a=>a.name));
+  const personalAccs = rows.filter(r=> personalNames.has(r.name) && r.bal!==0).sort((a,b)=> a.name.localeCompare(b.name));
+
   // Zero-balance accounts summary list mein show nahi honge
   // Sabse upar Credit (Jama) accounts - zyada jama wala sabse upar
-  const creditAccs = rows.filter(r=>r.bal<0).sort((a,b)=> a.bal - b.bal);
+  const creditAccs = rows.filter(r=>r.bal<0 && !personalNames.has(r.name)).sort((a,b)=> a.bal - b.bal);
   // Neeche Debit (Baqaya) accounts - zyada baqaya wala upar
-  const debitAccs = rows.filter(r=>r.bal>0).sort((a,b)=> b.bal - a.bal);
+  const debitAccs = rows.filter(r=>r.bal>0 && !personalNames.has(r.name)).sort((a,b)=> b.bal - a.bal);
 
   let html = '';
+  if(personalAccs.length){
+    html += '<div class="summarySectionHead personalHead">Personal Accounts</div>';
+    personalAccs.forEach(r=>{
+      html += '<div class="summaryRow"><span class="accName">'+escapeHtml(r.name)+'</span>'+
+        '<span class="accBal '+(r.bal>=0?'balPos':'balNeg')+'">'+fmt(Math.abs(r.bal))+(r.bal>=0?' Baqaya':' Jama')+'</span></div>';
+    });
+  }
   if(creditAccs.length){
     html += '<div class="summarySectionHead jamaHead">Jama Accounts</div>';
     creditAccs.forEach(r=>{
