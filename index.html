@@ -194,6 +194,9 @@ table tr:hover td{background:var(--orange-light);}
 .summarySectionHead.baqayaHead{color:var(--debit);border-top:2px solid var(--border);margin-top:10px;padding-top:16px;}
 .summarySectionHead.personalHead{color:#6c5ce7;}
 .summaryList>.summarySectionHead:first-child{border-top:none;margin-top:0;padding-top:0;}
+.summaryRow.sectionTotal{border-top:2px solid var(--border);border-bottom:none;margin-top:2px;padding-top:9px;break-inside:avoid;page-break-inside:avoid;}
+.summaryRow.sectionTotal .accName{text-transform:uppercase;font-size:12px;letter-spacing:.4px;font-weight:700;}
+.summaryRow.sectionTotal .accBal{font-size:14.5px;}
 
 .personalAccBox{margin-bottom:16px;}
 .personalPicker{
@@ -247,6 +250,9 @@ tfoot td{border-bottom:none;border-top:2px solid var(--orange);}
   #page-summary .summaryRow{
     border:1px solid #000;border-bottom:1px solid #000;border-radius:4px;
     margin-bottom:5px;padding:7px 9px;font-weight:700;
+  }
+  #page-summary .summaryRow.sectionTotal{
+    border:2px solid #000;background:#eee;-webkit-print-color-adjust:exact;print-color-adjust:exact;
   }
 }
 
@@ -1365,7 +1371,8 @@ function renderSummary(){
 
   // Personal Accounts (user-selected) sabse upar, phir baqi Jama/Baqaya sections mein
   const personalNames = new Set(DATA.accounts.filter(a=>a.personal).map(a=>a.name));
-  const personalAccs = rows.filter(r=> personalNames.has(r.name) && r.bal!==0).sort((a,b)=> a.name.localeCompare(b.name));
+  // Personal Accounts mein bhi zyada raqam wala account sabse upar (absolute balance ke hisab se)
+  const personalAccs = rows.filter(r=> personalNames.has(r.name) && r.bal!==0).sort((a,b)=> Math.abs(b.bal) - Math.abs(a.bal));
 
   // Zero-balance accounts summary list mein show nahi honge
   // Sabse upar Credit (Jama) accounts - zyada jama wala sabse upar
@@ -1376,24 +1383,36 @@ function renderSummary(){
   let html = '';
   if(personalAccs.length){
     html += '<div class="summarySectionHead personalHead">Personal Accounts</div>';
+    let personalTotal = 0;
     personalAccs.forEach(r=>{
+      personalTotal += r.bal;
       html += '<div class="summaryRow"><span class="accName">'+escapeHtml(r.name)+'</span>'+
         '<span class="accBal '+(r.bal>=0?'balPos':'balNeg')+'">'+fmt(Math.abs(r.bal))+(r.bal>=0?' Baqaya':' Jama')+'</span></div>';
     });
+    html += '<div class="summaryRow sectionTotal"><span class="accName">Personal Total</span>'+
+      '<span class="accBal '+(personalTotal>=0?'balPos':'balNeg')+'">'+fmt(Math.abs(personalTotal))+(personalTotal>=0?' Baqaya':' Jama')+'</span></div>';
   }
   if(creditAccs.length){
     html += '<div class="summarySectionHead jamaHead">Jama Accounts</div>';
+    let jamaTotal = 0;
     creditAccs.forEach(r=>{
+      jamaTotal += r.bal;
       html += '<div class="summaryRow"><span class="accName">'+escapeHtml(r.name)+'</span>'+
         '<span class="accBal balNeg">'+fmt(Math.abs(r.bal))+' Jama</span></div>';
     });
+    html += '<div class="summaryRow sectionTotal"><span class="accName">Jama Total</span>'+
+      '<span class="accBal balNeg">'+fmt(Math.abs(jamaTotal))+' Jama</span></div>';
   }
   if(debitAccs.length){
     html += '<div class="summarySectionHead baqayaHead">Baqaya Accounts</div>';
+    let baqayaTotal = 0;
     debitAccs.forEach(r=>{
+      baqayaTotal += r.bal;
       html += '<div class="summaryRow"><span class="accName">'+escapeHtml(r.name)+'</span>'+
         '<span class="accBal balPos">'+fmt(Math.abs(r.bal))+' Baqaya</span></div>';
     });
+    html += '<div class="summaryRow sectionTotal"><span class="accName">Baqaya Total</span>'+
+      '<span class="accBal balPos">'+fmt(Math.abs(baqayaTotal))+' Baqaya</span></div>';
   }
   document.getElementById('summaryList').innerHTML = html || '<div style="text-align:center;color:#999;padding:14px;">Koi account nahi</div>';
 
