@@ -320,6 +320,7 @@ tfoot td{border-bottom:none;border-top:2px solid var(--orange);}
 
 <!-- ===================== MAIN APP ===================== -->
 <div id="app" class="hidden">
+  <div id="fbSyncError" class="hidden" style="position:fixed;top:0;left:0;right:0;z-index:10000;background:var(--debit);color:#fff;padding:10px 16px;font-size:13.5px;text-align:center;"></div>
   <button id="floatingLogoutBtn" class="noPrint" onclick="doLogout()" title="Logout">⏻ Logout</button>
   <div id="sidebar">
     <div class="brand">
@@ -780,11 +781,26 @@ function enableFirebaseAgain(){
   location.reload();
 }
 
+function showFbSyncError(text){
+  const banner = document.getElementById('fbSyncError');
+  if(banner){ banner.textContent = text; banner.classList.remove('hidden'); }
+  // Login screen abhi tak nazar aa raha ho to wahan bhi dikha dein
+  const msg = document.getElementById('loginMsg');
+  if(msg && !document.getElementById('loginScreen').classList.contains('hidden')){
+    msg.className='loginMsg err'; msg.textContent = text;
+  }
+}
+function hideFbSyncError(){
+  const banner = document.getElementById('fbSyncError');
+  if(banner){ banner.classList.add('hidden'); banner.textContent=''; }
+}
+
 function startFirebaseSession(){
   if(firebaseSessionStarted) return;
   firebaseSessionStarted = true;
   const docRef = fbDB.collection('shopdata').doc('main');
   unsubscribeSnapshot = docRef.onSnapshot(function(snap){
+    hideFbSyncError();
     if(snap.exists){
       const remote = snap.data();
       if(remote && remote.entries !== undefined){
@@ -808,8 +824,14 @@ function startFirebaseSession(){
     }
   }, function(err){
     console.error('Snapshot error', err);
-    const msg = document.getElementById('loginMsg');
-    if(msg){ msg.className='loginMsg err'; msg.textContent = 'Firestore se connect nahi ho saka: ' + err.message; }
+    firebaseSessionStarted = false; // agar dobara try karna ho to
+    let text;
+    if(err.code === 'permission-denied'){
+      text = 'Cloud data load nahi ho saka: Firestore Security Rules is account ko read/write ki ijazat nahi de rahe. Firebase Console → Firestore → Rules check karen.';
+    } else {
+      text = 'Firestore se connect nahi ho saka: ' + err.message;
+    }
+    showFbSyncError(text);
   });
 }
 
