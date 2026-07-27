@@ -262,11 +262,6 @@ tfoot td{border-bottom:none;border-top:2px solid var(--orange);}
   #page-summary .summaryRow.sectionTotal{
     border:2px solid #000;background:#eee;-webkit-print-color-adjust:exact;print-color-adjust:exact;
   }
-  body.hideJamaPrint #page-summary .printSection-jama{display:none !important;}
-  body.hidePersonalPrint #page-summary .printSection-personal{display:none !important;}
-  body.hideBaqayaPrint #page-summary .printSection-baqaya{display:none !important;}
-  body.hideJamaPrint #page-summary .printSection-personal>.summarySectionHead{border-top:none !important;margin-top:0 !important;padding-top:0 !important;}
-  body.hideJamaPrint.hidePersonalPrint #page-summary .printSection-baqaya>.summarySectionHead{border-top:none !important;margin-top:0 !important;padding-top:0 !important;}
 }
 
 /* ---------- MOBILE RESPONSIVE ---------- */
@@ -1389,7 +1384,86 @@ function togglePersonalAccount(encName, checked){
   if(acc){ acc.personal = checked; saveData(); renderSummary(); }
 }
 
-/* Summary page par sirf selected sections (Jama/Personal/Baqaya) print karne ke liye */
+/* ================= SUMMARY ================= */
+/* Sections ko banane wala shared function - normal render aur print filter dono isi ko use karte hain,
+   taake print filter DOM se hi ho (CSS/timing par depend na karna pade, isliye 100% reliable hai). */
+function buildSummarySections(includeJama, includePersonal, includeBaqaya){
+  const totals = computeAccountTotals();
+  const rows = Object.keys(totals).map(name=>{
+    const t = totals[name];
+    const bal = t.debit - t.credit; // bal>=0 => Baqaya (debit), bal<0 => Jama (credit)
+    return {name, debit:t.debit, credit:t.credit, bal};
+  });
+
+  const personalNames = new Set(DATA.accounts.filter(a=>a.personal).map(a=>a.name));
+  const personalAccs = rows.filter(r=> personalNames.has(r.name) && r.bal!==0).sort((a,b)=> Math.abs(b.bal) - Math.abs(a.bal));
+  const creditAccs = rows.filter(r=>r.bal<0 && !personalNames.has(r.name)).sort((a,b)=> a.bal - b.bal);
+  const debitAccs = rows.filter(r=>r.bal>0 && !personalNames.has(r.name)).sort((a,b)=> b.bal - a.bal);
+
+  let html = '';
+  let jamaTotal = 0, personalTotal = 0, baqayaTotal = 0;
+
+  if(includeJama && creditAccs.length){
+    html += '<div class="printSection printSection-jama">';
+    html += '<div class="summarySectionHead jamaHead">Jama Accounts</div>';
+    creditAccs.forEach(r=>{
+      jamaTotal += r.bal;
+      html += '<div class="summaryRow"><span class="accName">'+escapeHtml(r.name)+'</span>'+
+        '<span class="accBal balNeg">'+fmt(Math.abs(r.bal))+' Jama</span></div>';
+    });
+    html += '<div class="summaryRow sectionTotal"><span class="accName">Jama Total</span>'+
+      '<span class="accBal balNeg">'+fmt(Math.abs(jamaTotal))+' Jama</span></div>';
+    html += '</div>';
+  }
+  if(includePersonal && personalAccs.length){
+    html += '<div class="printSection printSection-personal">';
+    html += '<div class="summarySectionHead personalHead">Personal Accounts</div>';
+    personalAccs.forEach(r=>{
+      personalTotal += r.bal;
+      html += '<div class="summaryRow"><span class="accName">'+escapeHtml(r.name)+'</span>'+
+        '<span class="accBal '+(r.bal>=0?'balPos':'balNeg')+'">'+fmt(Math.abs(r.bal))+(r.bal>=0?' Baqaya':' Jama')+'</span></div>';
+    });
+    html += '<div class="summaryRow sectionTotal"><span class="accName">Personal Total</span>'+
+      '<span class="accBal '+(personalTotal>=0?'balPos':'balNeg')+'">'+fmt(Math.abs(personalTotal))+(personalTotal>=0?' Baqaya':' Jama')+'</span></div>';
+    html += '</div>';
+  }
+  if(includeBaqaya && debitAccs.length){
+    html += '<div class="printSection printSection-baqaya">';
+    html += '<div class="summarySectionHead baqayaHead">Baqaya Accounts</div>';
+    debitAccs.forEach(r=>{
+      baqayaTotal += r.bal;
+      html += '<div class="summaryRow"><span class="accName">'+escapeHtml(r.name)+'</span>'+
+        '<span class="accBal balPos">'+fmt(Math.abs(r.bal))+' Baqaya</span></div>';
+    });
+    html += '<div class="summaryRow sectionTotal"><span class="accName">Baqaya Total</span>'+
+      '<span class="accBal balPos">'+fmt(Math.abs(baqayaTotal))+' Baqaya</span></div>';
+    html += '</div>';
+  }
+
+  return {html, rowsCount: rows.length, jamaTotal, personalTotal, baqayaTotal};
+}
+
+function renderSummary(){
+  const built = buildSummarySections(true, true, true);
+  document.getElementById('summaryList').innerHTML = built.html || '<div style="text-align:center;color:#999;padding:14px;">Koi account nahi</div>';
+
+  // Total Jama / Total Baqaya / Balance - account ke net balance se (har entry se nahi)
+  const { totalJama, totalBaqaya, balance } = computeBalanceTotals();
+  document.getElementById('summaryDebit').textContent = fmt(totalBaqaya);
+  document.getElementById('summaryCredit').textContent = fmt(totalJama);
+  document.getElementById('summaryNet').textContent = fmt(Math.abs(balance)) + (balance>=0 ? ' (Baqaya)' : ' (Jama)');
+
+  const totalBox = document.getElementById('summaryTotalBox');
+  totalBox.innerHTML = built.rowsCount ? (
+    '<div class="tItem"><div class="tLbl">Total Jama</div><div class="tVal creditTxt">'+fmt(totalJama)+'</div></div>'+
+    '<div class="tItem"><div class="tLbl">Total Baqaya</div><div class="tVal debitTxt">'+fmt(totalBaqaya)+'</div></div>'+
+    '<div class="tItem"><div class="tLbl">Balance</div><div class="tVal '+(balance>=0?'balPos':'balNeg')+'">'+fmt(Math.abs(balance))+(balance>=0?' Baqaya':' Jama')+'</div></div>'
+  ) : '';
+}
+
+/* Summary page par sirf selected sections (Jama/Personal/Baqaya) print karne ke liye.
+   DOM ko hi filtered content se replace karte hain (CSS/print-media par depend nahi karte),
+   isliye ye reliably kaam karega. Print ke baad original content wapis laga dete hain. */
 function printSummarySelected(){
   const wantJama = document.getElementById('printChkJama').checked;
   const wantPersonal = document.getElementById('printChkPersonal').checked;
@@ -1400,93 +1474,47 @@ function printSummarySelected(){
     return;
   }
 
-  const body = document.body;
-  body.classList.toggle('hideJamaPrint', !wantJama);
-  body.classList.toggle('hidePersonalPrint', !wantPersonal);
-  body.classList.toggle('hideBaqayaPrint', !wantBaqaya);
+  const listEl = document.getElementById('summaryList');
+  const totalBoxEl = document.getElementById('summaryTotalBox');
+  const originalListHtml = listEl.innerHTML;
+  const originalTotalBoxHtml = totalBoxEl.innerHTML;
+
+  const built = buildSummarySections(wantJama, wantPersonal, wantBaqaya);
+  listEl.innerHTML = built.html || '<div style="text-align:center;color:#999;padding:14px;">Is section mein koi account nahi</div>';
+
+  const allThreeSelected = wantJama && wantPersonal && wantBaqaya;
+  if(allThreeSelected){
+    // Sab select hain -> normal combined totals wahi dikhao jo already ban chuke hain
+    totalBoxEl.innerHTML = originalTotalBoxHtml;
+  } else {
+    // Sirf selected section(s) ka apna total dikhao - "sirf uska total balance"
+    let items = '';
+    if(wantJama){
+      items += '<div class="tItem"><div class="tLbl">Total Jama</div><div class="tVal creditTxt">'+fmt(Math.abs(built.jamaTotal))+'</div></div>';
+    }
+    if(wantPersonal){
+      items += '<div class="tItem"><div class="tLbl">Personal Total</div><div class="tVal '+(built.personalTotal>=0?'debitTxt':'creditTxt')+'">'+fmt(Math.abs(built.personalTotal))+(built.personalTotal>=0?' Baqaya':' Jama')+'</div></div>';
+    }
+    if(wantBaqaya){
+      items += '<div class="tItem"><div class="tLbl">Total Baqaya</div><div class="tVal debitTxt">'+fmt(Math.abs(built.baqayaTotal))+'</div></div>';
+    }
+    totalBoxEl.innerHTML = items;
+  }
+
+  let restored = false;
+  function restore(){
+    if(restored) return;
+    restored = true;
+    listEl.innerHTML = originalListHtml;
+    totalBoxEl.innerHTML = originalTotalBoxHtml;
+    window.removeEventListener('afterprint', restore);
+  }
+  window.addEventListener('afterprint', restore);
 
   window.print();
 
-  // Print dialog band hone ke baad classes hata do taake screen par sab dobara dikhein
-  setTimeout(()=>{
-    body.classList.remove('hideJamaPrint','hidePersonalPrint','hideBaqayaPrint');
-  }, 500);
-}
-
-/* ================= SUMMARY ================= */
-function renderSummary(){
-  const totals = computeAccountTotals();
-  const rows = Object.keys(totals).map(name=>{
-    const t = totals[name];
-    const bal = t.debit - t.credit; // bal>=0 => Baqaya (debit), bal<0 => Jama (credit)
-    return {name, debit:t.debit, credit:t.credit, bal};
-  });
-
-  // Personal Accounts (user-selected) sabse upar, phir baqi Jama/Baqaya sections mein
-  const personalNames = new Set(DATA.accounts.filter(a=>a.personal).map(a=>a.name));
-  // Personal Accounts mein bhi zyada raqam wala account sabse upar (absolute balance ke hisab se)
-  const personalAccs = rows.filter(r=> personalNames.has(r.name) && r.bal!==0).sort((a,b)=> Math.abs(b.bal) - Math.abs(a.bal));
-
-  // Zero-balance accounts summary list mein show nahi honge
-  // Sabse upar Credit (Jama) accounts - zyada jama wala sabse upar
-  const creditAccs = rows.filter(r=>r.bal<0 && !personalNames.has(r.name)).sort((a,b)=> a.bal - b.bal);
-  // Neeche Debit (Baqaya) accounts - zyada baqaya wala upar
-  const debitAccs = rows.filter(r=>r.bal>0 && !personalNames.has(r.name)).sort((a,b)=> b.bal - a.bal);
-
-  let html = '';
-  if(creditAccs.length){
-    html += '<div class="printSection printSection-jama">';
-    html += '<div class="summarySectionHead jamaHead">Jama Accounts</div>';
-    let jamaTotal = 0;
-    creditAccs.forEach(r=>{
-      jamaTotal += r.bal;
-      html += '<div class="summaryRow"><span class="accName">'+escapeHtml(r.name)+'</span>'+
-        '<span class="accBal balNeg">'+fmt(Math.abs(r.bal))+' Jama</span></div>';
-    });
-    html += '<div class="summaryRow sectionTotal"><span class="accName">Jama Total</span>'+
-      '<span class="accBal balNeg">'+fmt(Math.abs(jamaTotal))+' Jama</span></div>';
-    html += '</div>';
-  }
-  if(personalAccs.length){
-    html += '<div class="printSection printSection-personal">';
-    html += '<div class="summarySectionHead personalHead">Personal Accounts</div>';
-    let personalTotal = 0;
-    personalAccs.forEach(r=>{
-      personalTotal += r.bal;
-      html += '<div class="summaryRow"><span class="accName">'+escapeHtml(r.name)+'</span>'+
-        '<span class="accBal '+(r.bal>=0?'balPos':'balNeg')+'">'+fmt(Math.abs(r.bal))+(r.bal>=0?' Baqaya':' Jama')+'</span></div>';
-    });
-    html += '<div class="summaryRow sectionTotal"><span class="accName">Personal Total</span>'+
-      '<span class="accBal '+(personalTotal>=0?'balPos':'balNeg')+'">'+fmt(Math.abs(personalTotal))+(personalTotal>=0?' Baqaya':' Jama')+'</span></div>';
-    html += '</div>';
-  }
-  if(debitAccs.length){
-    html += '<div class="printSection printSection-baqaya">';
-    html += '<div class="summarySectionHead baqayaHead">Baqaya Accounts</div>';
-    let baqayaTotal = 0;
-    debitAccs.forEach(r=>{
-      baqayaTotal += r.bal;
-      html += '<div class="summaryRow"><span class="accName">'+escapeHtml(r.name)+'</span>'+
-        '<span class="accBal balPos">'+fmt(Math.abs(r.bal))+' Baqaya</span></div>';
-    });
-    html += '<div class="summaryRow sectionTotal"><span class="accName">Baqaya Total</span>'+
-      '<span class="accBal balPos">'+fmt(Math.abs(baqayaTotal))+' Baqaya</span></div>';
-    html += '</div>';
-  }
-  document.getElementById('summaryList').innerHTML = html || '<div style="text-align:center;color:#999;padding:14px;">Koi account nahi</div>';
-
-  // Total Jama / Total Baqaya / Balance - account ke net balance se (har entry se nahi)
-  const { totalJama, totalBaqaya, balance } = computeBalanceTotals();
-  document.getElementById('summaryDebit').textContent = fmt(totalBaqaya);
-  document.getElementById('summaryCredit').textContent = fmt(totalJama);
-  document.getElementById('summaryNet').textContent = fmt(Math.abs(balance)) + (balance>=0 ? ' (Baqaya)' : ' (Jama)');
-
-  const totalBox = document.getElementById('summaryTotalBox');
-  totalBox.innerHTML = rows.length ? (
-    '<div class="tItem"><div class="tLbl">Total Jama</div><div class="tVal creditTxt">'+fmt(totalJama)+'</div></div>'+
-    '<div class="tItem"><div class="tLbl">Total Baqaya</div><div class="tVal debitTxt">'+fmt(totalBaqaya)+'</div></div>'+
-    '<div class="tItem"><div class="tLbl">Balance</div><div class="tVal '+(balance>=0?'balPos':'balNeg')+'">'+fmt(Math.abs(balance))+(balance>=0?' Baqaya':' Jama')+'</div></div>'
-  ) : '';
+  // Kuch browsers/webviews mein afterprint fire nahi hota, isliye fallback restore bhi rakha hai
+  setTimeout(restore, 1500);
 }
 
 /* ================= RECYCLE BIN ================= */
@@ -1601,9 +1629,6 @@ function renderAll(){
 
 /* ================= PWA INSTALL ================= */
 let deferredInstallPrompt = null;
-window.addEventListener('afterprint', function(){
-  document.body.classList.remove('hideJamaPrint','hidePersonalPrint','hideBaqayaPrint');
-});
 
 window.addEventListener('beforeinstallprompt', function(e){
   e.preventDefault();
