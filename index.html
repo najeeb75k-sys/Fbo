@@ -1443,27 +1443,46 @@ function buildSummarySections(includeJama, includePersonal, includeBaqaya){
   return {html, rowsCount: rows.length, jamaTotal, personalTotal, baqayaTotal};
 }
 
+// Jab print filter active ho (kisi section ko print se hata rakha ho), yahan uski state rehti hai.
+// Isay isliye persist karte hain kyunke ye app Firebase se real-time sync hoti hai - jab bhi DATA
+// save hoti hai, Firestore se "echo" wapis aakar renderAll()/renderSummary() ko dobara chala deta
+// hai. Agar filter sirf ek dafa DOM overwrite kar ke bhool jate, to wo echo hamara filtered content
+// turant wapis full (sub 3 sections) se badal deta - isi wajah se pehle print theek nahi ho raha tha.
+// Ab renderSummary() hamesha isi active filter ke mutabiq banega, chahe kitni bhi dafa dobara chale.
+let _summaryPrintFilter = null; // null = normal (sab sections), warna {jama,personal,baqaya}
+
 function renderSummary(){
-  const built = buildSummarySections(true, true, true);
+  const f = _summaryPrintFilter || {jama:true, personal:true, baqaya:true};
+  const built = buildSummarySections(f.jama, f.personal, f.baqaya);
   document.getElementById('summaryList').innerHTML = built.html || '<div style="text-align:center;color:#999;padding:14px;">Koi account nahi</div>';
 
-  // Total Jama / Total Baqaya / Balance - account ke net balance se (har entry se nahi)
-  const { totalJama, totalBaqaya, balance } = computeBalanceTotals();
-  document.getElementById('summaryDebit').textContent = fmt(totalBaqaya);
-  document.getElementById('summaryCredit').textContent = fmt(totalJama);
-  document.getElementById('summaryNet').textContent = fmt(Math.abs(balance)) + (balance>=0 ? ' (Baqaya)' : ' (Jama)');
-
   const totalBox = document.getElementById('summaryTotalBox');
-  totalBox.innerHTML = built.rowsCount ? (
-    '<div class="tItem"><div class="tLbl">Total Jama</div><div class="tVal creditTxt">'+fmt(totalJama)+'</div></div>'+
-    '<div class="tItem"><div class="tLbl">Total Baqaya</div><div class="tVal debitTxt">'+fmt(totalBaqaya)+'</div></div>'+
-    '<div class="tItem"><div class="tLbl">Balance</div><div class="tVal '+(balance>=0?'balPos':'balNeg')+'">'+fmt(Math.abs(balance))+(balance>=0?' Baqaya':' Jama')+'</div></div>'
-  ) : '';
+  const allThree = f.jama && f.personal && f.baqaya;
+
+  if(allThree){
+    // Total Jama / Total Baqaya / Balance - account ke net balance se (har entry se nahi)
+    const { totalJama, totalBaqaya, balance } = computeBalanceTotals();
+    document.getElementById('summaryDebit').textContent = fmt(totalBaqaya);
+    document.getElementById('summaryCredit').textContent = fmt(totalJama);
+    document.getElementById('summaryNet').textContent = fmt(Math.abs(balance)) + (balance>=0 ? ' (Baqaya)' : ' (Jama)');
+    totalBox.innerHTML = built.rowsCount ? (
+      '<div class="tItem"><div class="tLbl">Total Jama</div><div class="tVal creditTxt">'+fmt(totalJama)+'</div></div>'+
+      '<div class="tItem"><div class="tLbl">Total Baqaya</div><div class="tVal debitTxt">'+fmt(totalBaqaya)+'</div></div>'+
+      '<div class="tItem"><div class="tLbl">Balance</div><div class="tVal '+(balance>=0?'balPos':'balNeg')+'">'+fmt(Math.abs(balance))+(balance>=0?' Baqaya':' Jama')+'</div></div>'
+    ) : '';
+  } else {
+    // Print filter active hai - sirf selected section(s) ka apna total dikhao
+    let items = '';
+    if(f.jama) items += '<div class="tItem"><div class="tLbl">Total Jama</div><div class="tVal creditTxt">'+fmt(Math.abs(built.jamaTotal))+'</div></div>';
+    if(f.personal) items += '<div class="tItem"><div class="tLbl">Personal Total</div><div class="tVal '+(built.personalTotal>=0?'debitTxt':'creditTxt')+'">'+fmt(Math.abs(built.personalTotal))+(built.personalTotal>=0?' Baqaya':' Jama')+'</div></div>';
+    if(f.baqaya) items += '<div class="tItem"><div class="tLbl">Total Baqaya</div><div class="tVal debitTxt">'+fmt(Math.abs(built.baqayaTotal))+'</div></div>';
+    totalBox.innerHTML = items;
+    // Upar wale 3 cards (Total Jama/Baqaya/Balance) filter ke dauran overall figures hi dikhate rahen,
+    // in par koi asar nahi - sirf list aur neeche wala total box filter hote hain.
+  }
 }
 
-/* Summary page par sirf selected sections (Jama/Personal/Baqaya) print karne ke liye.
-   DOM ko hi filtered content se replace karte hain (CSS/print-media par depend nahi karte),
-   isliye ye reliably kaam karega. Print ke baad original content wapis laga dete hain. */
+/* Summary page par sirf selected sections (Jama/Personal/Baqaya) print karne ke liye. */
 let _printSummaryInProgress = false;
 function printSummarySelected(){
   if(_printSummaryInProgress) return;
@@ -1478,40 +1497,15 @@ function printSummarySelected(){
   }
 
   _printSummaryInProgress = true;
-
-  const listEl = document.getElementById('summaryList');
-  const totalBoxEl = document.getElementById('summaryTotalBox');
-  const originalListHtml = listEl.innerHTML;
-  const originalTotalBoxHtml = totalBoxEl.innerHTML;
-
-  const built = buildSummarySections(wantJama, wantPersonal, wantBaqaya);
-  listEl.innerHTML = built.html || '<div style="text-align:center;color:#999;padding:14px;">Is section mein koi account nahi</div>';
-
-  const allThreeSelected = wantJama && wantPersonal && wantBaqaya;
-  if(allThreeSelected){
-    // Sab select hain -> normal combined totals wahi dikhao jo already ban chuke hain
-    totalBoxEl.innerHTML = originalTotalBoxHtml;
-  } else {
-    // Sirf selected section(s) ka apna total dikhao - "sirf uska total balance"
-    let items = '';
-    if(wantJama){
-      items += '<div class="tItem"><div class="tLbl">Total Jama</div><div class="tVal creditTxt">'+fmt(Math.abs(built.jamaTotal))+'</div></div>';
-    }
-    if(wantPersonal){
-      items += '<div class="tItem"><div class="tLbl">Personal Total</div><div class="tVal '+(built.personalTotal>=0?'debitTxt':'creditTxt')+'">'+fmt(Math.abs(built.personalTotal))+(built.personalTotal>=0?' Baqaya':' Jama')+'</div></div>';
-    }
-    if(wantBaqaya){
-      items += '<div class="tItem"><div class="tLbl">Total Baqaya</div><div class="tVal debitTxt">'+fmt(Math.abs(built.baqayaTotal))+'</div></div>';
-    }
-    totalBoxEl.innerHTML = items;
-  }
+  _summaryPrintFilter = {jama:wantJama, personal:wantPersonal, baqaya:wantBaqaya};
+  renderSummary(); // filter ke mutabiq turant re-render
 
   let restored = false;
   function restore(){
     if(restored) return;
     restored = true;
-    listEl.innerHTML = originalListHtml;
-    totalBoxEl.innerHTML = originalTotalBoxHtml;
+    _summaryPrintFilter = null;
+    renderSummary(); // wapis normal (sab sections)
     window.removeEventListener('afterprint', restore);
     _printSummaryInProgress = false;
   }
@@ -1519,12 +1513,8 @@ function printSummarySelected(){
 
   window.print();
 
-  // NOTE: Mobile browsers (Android Chrome etc) par window.print() turant print dialog nahi kholta -
-  // thoda async hota hai. Isliye yahan koi jaldi wala (1-2 second) timeout restore NAHI lagate,
-  // warna filtered content print dialog khulne se PEHLE hi original (sab sections wale) content
-  // se replace ho jata tha aur print mein hamesha sub 3 sections aa jate the.
-  // 'afterprint' event hi asal signal hai ke print/preview band ho gaya hai. Sirf ek bohat lamba
-  // safety-net fallback rakha hai, agar kisi wajah se afterprint fire hi na ho.
+  // Mobile browsers par window.print() async hota hai, isliye jaldi wala restore nahi lagate.
+  // 'afterprint' hi asal signal hai. Ye sirf bohat lamba safety-net hai.
   setTimeout(restore, 60000);
 }
 
