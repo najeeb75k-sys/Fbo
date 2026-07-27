@@ -1464,7 +1464,10 @@ function renderSummary(){
 /* Summary page par sirf selected sections (Jama/Personal/Baqaya) print karne ke liye.
    DOM ko hi filtered content se replace karte hain (CSS/print-media par depend nahi karte),
    isliye ye reliably kaam karega. Print ke baad original content wapis laga dete hain. */
+let _printSummaryInProgress = false;
 function printSummarySelected(){
+  if(_printSummaryInProgress) return;
+
   const wantJama = document.getElementById('printChkJama').checked;
   const wantPersonal = document.getElementById('printChkPersonal').checked;
   const wantBaqaya = document.getElementById('printChkBaqaya').checked;
@@ -1473,6 +1476,8 @@ function printSummarySelected(){
     alert('Kam az kam ek section select karen jo print karna hai.');
     return;
   }
+
+  _printSummaryInProgress = true;
 
   const listEl = document.getElementById('summaryList');
   const totalBoxEl = document.getElementById('summaryTotalBox');
@@ -1508,13 +1513,19 @@ function printSummarySelected(){
     listEl.innerHTML = originalListHtml;
     totalBoxEl.innerHTML = originalTotalBoxHtml;
     window.removeEventListener('afterprint', restore);
+    _printSummaryInProgress = false;
   }
   window.addEventListener('afterprint', restore);
 
   window.print();
 
-  // Kuch browsers/webviews mein afterprint fire nahi hota, isliye fallback restore bhi rakha hai
-  setTimeout(restore, 1500);
+  // NOTE: Mobile browsers (Android Chrome etc) par window.print() turant print dialog nahi kholta -
+  // thoda async hota hai. Isliye yahan koi jaldi wala (1-2 second) timeout restore NAHI lagate,
+  // warna filtered content print dialog khulne se PEHLE hi original (sab sections wale) content
+  // se replace ho jata tha aur print mein hamesha sub 3 sections aa jate the.
+  // 'afterprint' event hi asal signal hai ke print/preview band ho gaya hai. Sirf ek bohat lamba
+  // safety-net fallback rakha hai, agar kisi wajah se afterprint fire hi na ho.
+  setTimeout(restore, 60000);
 }
 
 /* ================= RECYCLE BIN ================= */
