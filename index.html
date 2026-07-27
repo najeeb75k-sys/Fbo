@@ -1531,13 +1531,34 @@ function printSummarySelected(){
     window.removeEventListener('afterprint', restore);
     _printSummaryInProgress = false;
   }
-  window.addEventListener('afterprint', restore);
+  // Mobile (Android) Chrome par window.print() turant return kar deta hai aur 'afterprint'
+  // bhi bohat jaldi fire ho jata hai — asal PDF/print capture is ke KAAFI baad, alag se,
+  // hota hai. Agar hum filter foran hata dein to Android ka capture hone tak sab sections
+  // wapas aa chuke hote hain aur print mein filter nazar hi nahi aata. Isi liye restore ko
+  // 'afterprint' aur kam az kam 1.8s dono ka intezar karwate hain — jo bhi baad mein ho.
+  let afterPrintFired = false;
+  const MIN_DELAY = 1800;
+  window.addEventListener('afterprint', function onAfterPrint(){
+    afterPrintFired = true;
+    window.removeEventListener('afterprint', onAfterPrint);
+  });
+  setTimeout(function(){
+    if(!afterPrintFired){
+      // afterprint abhi nahi aaya (ho sakta hai desktop par dialog khula ho) - thora aur wait karen
+      const waitMore = setInterval(function(){
+        if(afterPrintFired || restored){
+          clearInterval(waitMore);
+          restore();
+        }
+      }, 300);
+      // safety net: bohat lambe intezar ke baad khud hi restore kar dein
+      setTimeout(function(){ clearInterval(waitMore); restore(); }, 55000);
+    } else {
+      restore();
+    }
+  }, MIN_DELAY);
 
   window.print();
-
-  // Mobile browsers par window.print() async hota hai, isliye jaldi wala restore nahi lagate.
-  // 'afterprint' hi asal signal hai. Ye sirf bohat lamba safety-net hai.
-  setTimeout(restore, 60000);
 }
 
 /* ================= RECYCLE BIN ================= */
