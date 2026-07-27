@@ -193,7 +193,7 @@ table tr:hover td{background:var(--orange-light);}
 .summarySectionHead.jamaHead{color:var(--credit);border-top:2px solid var(--border);margin-top:10px;padding-top:16px;}
 .summarySectionHead.baqayaHead{color:var(--debit);border-top:2px solid var(--border);margin-top:10px;padding-top:16px;}
 .summarySectionHead.personalHead{color:#6c5ce7;border-top:2px solid var(--border);margin-top:10px;padding-top:16px;}
-.summaryList>.summarySectionHead:first-child{border-top:none;margin-top:0;padding-top:0;}
+.summaryList>.printSection:first-child>.summarySectionHead{border-top:none;margin-top:0;padding-top:0;}
 .summaryRow.sectionTotal{border-top:2px solid var(--border);border-bottom:none;margin-top:2px;padding-top:9px;break-inside:avoid;page-break-inside:avoid;}
 .summaryRow.sectionTotal .accName{text-transform:uppercase;font-size:12px;letter-spacing:.4px;font-weight:700;}
 .summaryRow.sectionTotal .accBal{font-size:14.5px;}
@@ -205,6 +205,13 @@ table tr:hover td{background:var(--orange-light);}
 }
 .personalPickItem{display:flex;align-items:center;gap:6px;font-size:13.5px;cursor:pointer;}
 .personalPickItem input{cursor:pointer;}
+.printSectionPicker{
+  margin-bottom:16px;background:var(--white);border:1.5px solid var(--border);border-radius:10px;
+  padding:12px 16px;display:flex;flex-wrap:wrap;align-items:center;gap:8px 20px;
+}
+.printSectionPicker .psTitle{font-size:13.5px;font-weight:700;color:#555;}
+.printSectionPicker label{display:flex;align-items:center;gap:6px;font-size:13.5px;cursor:pointer;}
+.printSectionPicker input{cursor:pointer;width:16px;height:16px;}
 .summaryTotalBox{
   margin-top:18px;border:2px solid var(--orange-dark);border-radius:10px;padding:16px 20px;
   display:flex;justify-content:space-around;flex-wrap:wrap;gap:14px;break-inside:avoid;page-break-inside:avoid;
@@ -247,7 +254,7 @@ tfoot td{border-bottom:none;border-top:2px solid var(--orange);}
   #page-summary .summarySectionHead.jamaHead{border-top:2px solid #000;}
   #page-summary .summarySectionHead.baqayaHead{border-top:2px solid #000;}
   #page-summary .summarySectionHead.personalHead{border-top:2px solid #000;}
-  #page-summary .summaryList>.summarySectionHead:first-child{border-top:none;}
+  #page-summary .summaryList>.printSection:first-child>.summarySectionHead{border-top:none;}
   #page-summary .summaryRow{
     border:1px solid #000;border-bottom:1px solid #000;border-radius:4px;
     margin-bottom:5px;padding:7px 9px;font-weight:700;
@@ -255,6 +262,11 @@ tfoot td{border-bottom:none;border-top:2px solid var(--orange);}
   #page-summary .summaryRow.sectionTotal{
     border:2px solid #000;background:#eee;-webkit-print-color-adjust:exact;print-color-adjust:exact;
   }
+  body.hideJamaPrint #page-summary .printSection-jama{display:none !important;}
+  body.hidePersonalPrint #page-summary .printSection-personal{display:none !important;}
+  body.hideBaqayaPrint #page-summary .printSection-baqaya{display:none !important;}
+  body.hideJamaPrint #page-summary .printSection-personal>.summarySectionHead{border-top:none !important;margin-top:0 !important;padding-top:0 !important;}
+  body.hideJamaPrint.hidePersonalPrint #page-summary .printSection-baqaya>.summarySectionHead{border-top:none !important;margin-top:0 !important;padding-top:0 !important;}
 }
 
 /* ---------- MOBILE RESPONSIVE ---------- */
@@ -482,12 +494,18 @@ tfoot td{border-bottom:none;border-top:2px solid var(--orange);}
     <div id="page-summary" class="pageBox hidden">
       <div class="topbar">
         <h1>Summary — Sare Accounts</h1>
-        <button class="printBtn noPrint" onclick="window.print()">🖨️ Print</button>
+        <button class="printBtn noPrint" onclick="printSummarySelected()">🖨️ Print</button>
       </div>
       <div class="cards">
         <div class="card credit"><h3>Total Jama</h3><div class="val" id="summaryCredit">0</div></div>
         <div class="card debit"><h3>Total Baqaya</h3><div class="val" id="summaryDebit">0</div></div>
         <div class="card net"><h3>Balance</h3><div class="val" id="summaryNet">0</div></div>
+      </div>
+      <div class="printSectionPicker noPrint">
+        <span class="psTitle">Print mein sirf ye sections shamil karen:</span>
+        <label><input type="checkbox" id="printChkJama" checked> Jama Accounts</label>
+        <label><input type="checkbox" id="printChkPersonal" checked> Personal Accounts</label>
+        <label><input type="checkbox" id="printChkBaqaya" checked> Baqaya Accounts</label>
       </div>
       <div class="personalAccBox noPrint">
         <button class="printBtn" style="background:#6c5ce7;" onclick="togglePersonalPicker()">👤 Personal Accounts Select Karen</button>
@@ -1371,6 +1389,30 @@ function togglePersonalAccount(encName, checked){
   if(acc){ acc.personal = checked; saveData(); renderSummary(); }
 }
 
+/* Summary page par sirf selected sections (Jama/Personal/Baqaya) print karne ke liye */
+function printSummarySelected(){
+  const wantJama = document.getElementById('printChkJama').checked;
+  const wantPersonal = document.getElementById('printChkPersonal').checked;
+  const wantBaqaya = document.getElementById('printChkBaqaya').checked;
+
+  if(!wantJama && !wantPersonal && !wantBaqaya){
+    alert('Kam az kam ek section select karen jo print karna hai.');
+    return;
+  }
+
+  const body = document.body;
+  body.classList.toggle('hideJamaPrint', !wantJama);
+  body.classList.toggle('hidePersonalPrint', !wantPersonal);
+  body.classList.toggle('hideBaqayaPrint', !wantBaqaya);
+
+  window.print();
+
+  // Print dialog band hone ke baad classes hata do taake screen par sab dobara dikhein
+  setTimeout(()=>{
+    body.classList.remove('hideJamaPrint','hidePersonalPrint','hideBaqayaPrint');
+  }, 500);
+}
+
 /* ================= SUMMARY ================= */
 function renderSummary(){
   const totals = computeAccountTotals();
@@ -1393,6 +1435,7 @@ function renderSummary(){
 
   let html = '';
   if(creditAccs.length){
+    html += '<div class="printSection printSection-jama">';
     html += '<div class="summarySectionHead jamaHead">Jama Accounts</div>';
     let jamaTotal = 0;
     creditAccs.forEach(r=>{
@@ -1402,8 +1445,10 @@ function renderSummary(){
     });
     html += '<div class="summaryRow sectionTotal"><span class="accName">Jama Total</span>'+
       '<span class="accBal balNeg">'+fmt(Math.abs(jamaTotal))+' Jama</span></div>';
+    html += '</div>';
   }
   if(personalAccs.length){
+    html += '<div class="printSection printSection-personal">';
     html += '<div class="summarySectionHead personalHead">Personal Accounts</div>';
     let personalTotal = 0;
     personalAccs.forEach(r=>{
@@ -1413,8 +1458,10 @@ function renderSummary(){
     });
     html += '<div class="summaryRow sectionTotal"><span class="accName">Personal Total</span>'+
       '<span class="accBal '+(personalTotal>=0?'balPos':'balNeg')+'">'+fmt(Math.abs(personalTotal))+(personalTotal>=0?' Baqaya':' Jama')+'</span></div>';
+    html += '</div>';
   }
   if(debitAccs.length){
+    html += '<div class="printSection printSection-baqaya">';
     html += '<div class="summarySectionHead baqayaHead">Baqaya Accounts</div>';
     let baqayaTotal = 0;
     debitAccs.forEach(r=>{
@@ -1424,6 +1471,7 @@ function renderSummary(){
     });
     html += '<div class="summaryRow sectionTotal"><span class="accName">Baqaya Total</span>'+
       '<span class="accBal balPos">'+fmt(Math.abs(baqayaTotal))+' Baqaya</span></div>';
+    html += '</div>';
   }
   document.getElementById('summaryList').innerHTML = html || '<div style="text-align:center;color:#999;padding:14px;">Koi account nahi</div>';
 
@@ -1553,6 +1601,10 @@ function renderAll(){
 
 /* ================= PWA INSTALL ================= */
 let deferredInstallPrompt = null;
+window.addEventListener('afterprint', function(){
+  document.body.classList.remove('hideJamaPrint','hidePersonalPrint','hideBaqayaPrint');
+});
+
 window.addEventListener('beforeinstallprompt', function(e){
   e.preventDefault();
   deferredInstallPrompt = e;
