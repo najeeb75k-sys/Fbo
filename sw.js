@@ -1,4 +1,4 @@
-const CACHE_NAME = 'fb-accounting-v3';
+const CACHE_NAME = 'fb-accounting-v3'; // version bump so browser forcibly updates
 const FILES_TO_CACHE = [
   './index.html',
   './manifest.json',
@@ -29,14 +29,16 @@ self.addEventListener('activate', function(evt){
 });
 
 self.addEventListener('fetch', function(evt){
-  // Network-first for Firebase/API/Google-auth calls — never let the service
-  // worker touch these, warna installed app mein Google login slow ho jata hai.
+  // Network-first for Firebase/API calls, cache-first for app shell
   if(evt.request.url.indexOf('googleapis.com') !== -1 ||
      evt.request.url.indexOf('firestore') !== -1 ||
-     evt.request.url.indexOf('gstatic.com') !== -1 ||
-     evt.request.url.indexOf('google.com') !== -1 ||
-     evt.request.url.indexOf('googleusercontent.com') !== -1){
-    return; // let these go straight to network (Firebase/Google auth needs live connection)
+     evt.request.url.indexOf('gstatic.com') !== -1){
+    return; // let these go straight to network (Firebase needs live connection)
+  }
+
+  // Only cache GET requests — POST/PUT to cache.put() throws errors
+  if(evt.request.method !== 'GET'){
+    return;
   }
 
   // Network-first for the app page itself (index.html / navigation), so future
@@ -47,10 +49,14 @@ self.addEventListener('fetch', function(evt){
   if(isHtmlRequest){
     evt.respondWith(
       fetch(evt.request).then(function(response){
-        return caches.open(CACHE_NAME).then(function(cache){
-          cache.put(evt.request, response.clone());
-          return response;
-        });
+        // clone BEFORE any other use, and only cache valid, basic (same-origin) responses
+        const copy = response.clone();
+        if(response.ok && response.type === 'basic'){
+          caches.open(CACHE_NAME).then(function(cache){
+            cache.put(evt.request, copy).catch(function(){ /* ignore cache errors */ });
+          });
+        }
+        return response;
       }).catch(function(){
         return caches.match(evt.request);
       })
@@ -61,17 +67,18 @@ self.addEventListener('fetch', function(evt){
   // Cache-first for static assets (icons, manifest, etc.)
   evt.respondWith(
     caches.match(evt.request).then(function(cached){
-      return cached || fetch(evt.request).then(function(response){
-        return caches.open(CACHE_NAME).then(function(cache){
-          if(evt.request.method === 'GET'){
-            cache.put(evt.request, response.clone());
-          }
-          return response;
-        });
+      if(cached) return cached;
+      return fetch(evt.request).then(function(response){
+        const copy = response.clone();
+        if(response.ok && response.type === 'basic'){
+          caches.open(CACHE_NAME).then(function(cache){
+            cache.put(evt.request, copy).catch(function(){ /* ignore cache errors */ });
+          });
+        }
+        return response;
       }).catch(function(){
         return cached;
       });
     })
   );
 });
-
