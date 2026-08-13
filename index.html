@@ -99,9 +99,10 @@ body{background:var(--bg);color:var(--text);}
 .topbar h1{font-size:22px;color:var(--orange-dark);}
 .printBtn{background:var(--orange);color:#fff;border:none;padding:9px 18px;border-radius:8px;cursor:pointer;font-size:14px;}
 .printBtn:hover{background:var(--orange-dark);}
-.imgBtn{background:#1e9e5a;color:#fff;border:none;padding:9px 18px;border-radius:8px;cursor:pointer;font-size:14px;margin-left:8px;}
+.imgBtn{background:#1e9e5a;color:#fff;border:none;padding:9px 18px;border-radius:8px;cursor:pointer;font-size:14px;}
 .imgBtn:hover{background:#167a45;}
 .imgBtn:disabled{opacity:.6;cursor:wait;}
+.topbarBtnGroup{display:flex;gap:8px;flex-wrap:wrap;}
 
 /* Cards */
 .cards{display:flex;gap:18px;flex-wrap:wrap;margin-bottom:26px;}
@@ -231,7 +232,7 @@ tfoot td{border-bottom:none;border-top:2px solid var(--orange);}
 
 /* Print */
 @media print{
-  #sidebar, .topbar .printBtn, .noPrint{display:none !important;}
+  #sidebar, .topbar .printBtn, .topbarBtnGroup, .noPrint{display:none !important;}
   #main{padding:0;}
   body{background:#fff;}
   .tblWrap,.card,.cards,.summaryListWrap{box-shadow:none;border:1px solid #999;}
@@ -355,8 +356,10 @@ tfoot td{border-bottom:none;border-top:2px solid var(--orange);}
     <div id="page-dashboard" class="pageBox">
       <div class="topbar">
         <h1>Dashboard</h1>
-        <button class="printBtn" onclick="window.print()">🖨️ Print</button>
-        <button class="imgBtn noPrint" onclick="saveAsImage('page-dashboard', this)">🖼️ Picture Save Karen</button>
+        <div class="topbarBtnGroup">
+          <button class="printBtn" onclick="window.print()">🖨️ Print</button>
+          <button class="imgBtn noPrint" onclick="saveAsImage('page-dashboard', this)">🖼️ Picture Save Karen</button>
+        </div>
       </div>
       <div class="cards">
         <div class="card debit"><h3>Total Baqaya</h3><div class="val" id="dashDebit">0</div></div>
@@ -375,8 +378,10 @@ tfoot td{border-bottom:none;border-top:2px solid var(--orange);}
     <div id="page-cashbook" class="pageBox hidden">
       <div class="topbar">
         <h1>Cash Book</h1>
-        <button class="printBtn" onclick="window.print()">🖨️ Print</button>
-        <button class="imgBtn noPrint" onclick="saveAsImage('page-cashbook', this)">🖼️ Picture Save Karen</button>
+        <div class="topbarBtnGroup">
+          <button class="printBtn" onclick="window.print()">🖨️ Print</button>
+          <button class="imgBtn noPrint" onclick="saveAsImage('page-cashbook', this)">🖼️ Picture Save Karen</button>
+        </div>
       </div>
       <div class="formBox noPrint">
         <h3 id="cbFormTitle">Nayi Entry</h3>
@@ -420,8 +425,10 @@ tfoot td{border-bottom:none;border-top:2px solid var(--orange);}
     <div id="page-opening" class="pageBox hidden">
       <div class="topbar">
         <h1>Opening Balance</h1>
-        <button class="printBtn" onclick="window.print()">🖨️ Print</button>
-        <button class="imgBtn noPrint" onclick="saveAsImage('page-opening', this)">🖼️ Picture Save Karen</button>
+        <div class="topbarBtnGroup">
+          <button class="printBtn" onclick="window.print()">🖨️ Print</button>
+          <button class="imgBtn noPrint" onclick="saveAsImage('page-opening', this)">🖼️ Picture Save Karen</button>
+        </div>
       </div>
       <p class="noPrint" style="font-size:12.5px;color:#888;margin-bottom:14px;">
         Yahan jo account naam likhenge, wo agar Account List mein nahi hai to khud-ba-khud naya account ban jayega, apne opening baqaya/jama balance ke sath.
@@ -461,8 +468,10 @@ tfoot td{border-bottom:none;border-top:2px solid var(--orange);}
     <div id="page-accounts" class="pageBox hidden">
       <div class="topbar">
         <h1>Account List</h1>
-        <button class="printBtn" onclick="window.print()">🖨️ Print</button>
-        <button class="imgBtn noPrint" onclick="saveAsImage('page-accounts', this)">🖼️ Picture Save Karen</button>
+        <div class="topbarBtnGroup">
+          <button class="printBtn" onclick="window.print()">🖨️ Print</button>
+          <button class="imgBtn noPrint" onclick="saveAsImage('page-accounts', this)">🖼️ Picture Save Karen</button>
+        </div>
       </div>
       <div class="addAccBox noPrint">
         <input type="text" id="newAccName" placeholder="Naya account ka naam">
@@ -483,8 +492,10 @@ tfoot td{border-bottom:none;border-top:2px solid var(--orange);}
     <div id="page-accountDetail" class="pageBox hidden">
       <div class="topbar">
         <h1 id="accDetailTitle">Account</h1>
-        <button class="printBtn" onclick="window.print()">🖨️ Print</button>
-        <button class="imgBtn noPrint" onclick="saveAsImage('page-accountDetail', this)">🖼️ Picture Save Karen</button>
+        <div class="topbarBtnGroup">
+          <button class="printBtn" onclick="window.print()">🖨️ Print</button>
+          <button class="imgBtn noPrint" onclick="saveAsImage('page-accountDetail', this)">🖼️ Picture Save Karen</button>
+        </div>
       </div>
       <button class="backBtn noPrint" onclick="goPage('accounts')">← Wapas Account List</button>
       <div class="tblWrap">
@@ -499,8 +510,10 @@ tfoot td{border-bottom:none;border-top:2px solid var(--orange);}
     <div id="page-summary" class="pageBox hidden">
       <div class="topbar">
         <h1>Summary — Sare Accounts</h1>
-        <button class="printBtn noPrint" onclick="printSummarySelected()">🖨️ Print</button>
-        <button class="imgBtn noPrint" onclick="saveSummaryAsImage(this)">🖼️ Picture Save Karen</button>
+        <div class="topbarBtnGroup">
+          <button class="printBtn noPrint" onclick="printSummarySelected()">🖨️ Print</button>
+          <button class="imgBtn noPrint" onclick="saveSummaryAsImage(this)">🖼️ Picture Save Karen</button>
+        </div>
       </div>
       <div class="cards">
         <div class="card credit"><h3>Total Jama</h3><div class="val" id="summaryCredit">0</div></div>
@@ -966,10 +979,12 @@ function goPage(page, accName){
   updatePrintHeader();
 }
 
-/* ================= SAVE AS PICTURE (sharp PNG, blur-free) ================= */
+/* ================= SAVE AS PICTURE (sharp, A4 page-fit, blur-free) ================= */
 /* Print view ko screenshot lene se blur aata hai (page scaled/zoomed hoti hai).
-   Ye function usi print-layout ko ek alag offscreen wrapper mein clone karke,
-   html2canvas se high-resolution (scale 3) PNG banata hai - koi blur nahi. */
+   Ye function usi print-layout ko offscreen clone karke, html2canvas se sharp
+   render karta hai, phir user ki batayi hui page-count (1/2/3) ke A4 size mein
+   fit karta hai - agar content zyada ho to print ki tarah proportionally
+   shrink karke usi page-count mein sama deta hai. */
 function saveAsImage(pageId, btnEl){
   const original = document.getElementById(pageId);
   if(!original){ alert('Page nahi mila.'); return; }
@@ -977,6 +992,13 @@ function saveAsImage(pageId, btnEl){
     alert('Image save library load nahi hui. Internet check karen aur dobara try karen.');
     return;
   }
+
+  let pagesWanted = prompt('Picture kitne page mein chahiye? (1, 2 ya 3 likhen)', '1');
+  if(pagesWanted === null) return; // user ne cancel kiya
+  pagesWanted = parseInt(pagesWanted, 10);
+  if(!pagesWanted || pagesWanted < 1) pagesWanted = 1;
+  if(pagesWanted > 3) pagesWanted = 3;
+
   if(btnEl){ btnEl.disabled = true; btnEl.textContent = '⏳ Ban raha hai...'; }
   updatePrintHeader();
 
@@ -1008,21 +1030,83 @@ function saveAsImage(pageId, btnEl){
 
   document.body.appendChild(wrapper);
 
-  html2canvas(wrapper, {scale: 3, backgroundColor: '#ffffff', useCORS: true}).then(function(canvas){
+  html2canvas(wrapper, {scale: 2, backgroundColor: '#ffffff', useCORS: true}).then(function(sourceCanvas){
     document.body.removeChild(wrapper);
+    fitCanvasToPagesAndDownload(sourceCanvas, pageId, pagesWanted);
     if(btnEl){ btnEl.disabled = false; btnEl.textContent = '🖼️ Picture Save Karen'; }
-    const link = document.createElement('a');
-    const safeName = (pageId || 'page').replace('page-', '');
-    link.download = safeName + '_' + Date.now() + '.png';
-    link.href = canvas.toDataURL('image/png');
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
   }).catch(function(err){
     if(document.body.contains(wrapper)) document.body.removeChild(wrapper);
     if(btnEl){ btnEl.disabled = false; btnEl.textContent = '🖼️ Picture Save Karen'; }
     alert('Picture save nahi ho saki: ' + err.message);
   });
+}
+
+/* sourceCanvas ko A4 page-ratio (210x297) ke hisaab se ek ya zyada page-images
+   mein badal kar har page ko alag PNG file ke tor par download karta hai.
+   Agar content maxPages se zyada tall hai to poora content proportionally
+   shrink kar diya jata hai taake maxPages mein sama jaye (print ke "fit to
+   page" jaisa). Agar content pehle hi kam pages mein aa jaye to utne hi
+   pages banenge, khali extra pages nahi banaye jate. */
+function fitCanvasToPagesAndDownload(sourceCanvas, pageId, maxPages){
+  const PW = sourceCanvas.width;                 // page width (px) - reference
+  const PH = Math.round(PW * (297/210));          // A4 page height at that width
+
+  let contentW = sourceCanvas.width;
+  let contentH = sourceCanvas.height;
+
+  // Agar content maxPages ke andar naturally nahi aata, to poora content
+  // proportionally itna shrink kar do ke exactly maxPages mein aa jaye.
+  const maxAllowedHeight = maxPages * PH;
+  let drawCanvas = sourceCanvas;
+  if(contentH > maxAllowedHeight){
+    const shrink = maxAllowedHeight / contentH;
+    const scaledW = Math.max(1, Math.round(contentW * shrink));
+    const scaledH = Math.max(1, Math.round(contentH * shrink));
+    const shrunk = document.createElement('canvas');
+    shrunk.width = scaledW;
+    shrunk.height = scaledH;
+    const sctx = shrunk.getContext('2d');
+    sctx.fillStyle = '#ffffff';
+    sctx.fillRect(0, 0, scaledW, scaledH);
+    sctx.drawImage(sourceCanvas, 0, 0, scaledW, scaledH);
+    drawCanvas = shrunk;
+    contentW = scaledW;
+    contentH = scaledH;
+  }
+
+  const pagesNeeded = Math.max(1, Math.min(maxPages, Math.ceil(contentH / PH)));
+
+  // Sab pages ka combined canvas: full page width (PW), content ko horizontally
+  // center karte hain agar shrink ki wajah se width kam ho gayi ho.
+  const combined = document.createElement('canvas');
+  combined.width = PW;
+  combined.height = pagesNeeded * PH;
+  const cctx = combined.getContext('2d');
+  cctx.fillStyle = '#ffffff';
+  cctx.fillRect(0, 0, combined.width, combined.height);
+  const offsetX = Math.round((PW - contentW) / 2);
+  cctx.drawImage(drawCanvas, offsetX, 0);
+
+  const safeName = (pageId || 'page').replace('page-', '');
+  const stamp = Date.now();
+
+  for(let i = 0; i < pagesNeeded; i++){
+    const pageCanvas = document.createElement('canvas');
+    pageCanvas.width = PW;
+    pageCanvas.height = PH;
+    const pctx = pageCanvas.getContext('2d');
+    pctx.fillStyle = '#ffffff';
+    pctx.fillRect(0, 0, PW, PH);
+    pctx.drawImage(combined, 0, i * PH, PW, PH, 0, 0, PW, PH);
+
+    const link = document.createElement('a');
+    const suffix = pagesNeeded > 1 ? ('_page' + (i + 1) + 'of' + pagesNeeded) : '';
+    link.download = safeName + suffix + '_' + stamp + '.png';
+    link.href = pageCanvas.toDataURL('image/png');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
 }
 
 /* Summary page ke liye - pehle selected sections ka filter apply karta hai, phir image banata hai. */
