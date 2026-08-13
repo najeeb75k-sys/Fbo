@@ -17,6 +17,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore-compat.js"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <style>
 :root{
   --orange:#FF7A1A;
@@ -98,6 +99,9 @@ body{background:var(--bg);color:var(--text);}
 .topbar h1{font-size:22px;color:var(--orange-dark);}
 .printBtn{background:var(--orange);color:#fff;border:none;padding:9px 18px;border-radius:8px;cursor:pointer;font-size:14px;}
 .printBtn:hover{background:var(--orange-dark);}
+.imgBtn{background:#1e9e5a;color:#fff;border:none;padding:9px 18px;border-radius:8px;cursor:pointer;font-size:14px;margin-left:8px;}
+.imgBtn:hover{background:#167a45;}
+.imgBtn:disabled{opacity:.6;cursor:wait;}
 
 /* Cards */
 .cards{display:flex;gap:18px;flex-wrap:wrap;margin-bottom:26px;}
@@ -352,6 +356,7 @@ tfoot td{border-bottom:none;border-top:2px solid var(--orange);}
       <div class="topbar">
         <h1>Dashboard</h1>
         <button class="printBtn" onclick="window.print()">🖨️ Print</button>
+        <button class="imgBtn noPrint" onclick="saveAsImage('page-dashboard', this)">🖼️ Picture Save Karen</button>
       </div>
       <div class="cards">
         <div class="card debit"><h3>Total Baqaya</h3><div class="val" id="dashDebit">0</div></div>
@@ -371,6 +376,7 @@ tfoot td{border-bottom:none;border-top:2px solid var(--orange);}
       <div class="topbar">
         <h1>Cash Book</h1>
         <button class="printBtn" onclick="window.print()">🖨️ Print</button>
+        <button class="imgBtn noPrint" onclick="saveAsImage('page-cashbook', this)">🖼️ Picture Save Karen</button>
       </div>
       <div class="formBox noPrint">
         <h3 id="cbFormTitle">Nayi Entry</h3>
@@ -415,6 +421,7 @@ tfoot td{border-bottom:none;border-top:2px solid var(--orange);}
       <div class="topbar">
         <h1>Opening Balance</h1>
         <button class="printBtn" onclick="window.print()">🖨️ Print</button>
+        <button class="imgBtn noPrint" onclick="saveAsImage('page-opening', this)">🖼️ Picture Save Karen</button>
       </div>
       <p class="noPrint" style="font-size:12.5px;color:#888;margin-bottom:14px;">
         Yahan jo account naam likhenge, wo agar Account List mein nahi hai to khud-ba-khud naya account ban jayega, apne opening baqaya/jama balance ke sath.
@@ -455,6 +462,7 @@ tfoot td{border-bottom:none;border-top:2px solid var(--orange);}
       <div class="topbar">
         <h1>Account List</h1>
         <button class="printBtn" onclick="window.print()">🖨️ Print</button>
+        <button class="imgBtn noPrint" onclick="saveAsImage('page-accounts', this)">🖼️ Picture Save Karen</button>
       </div>
       <div class="addAccBox noPrint">
         <input type="text" id="newAccName" placeholder="Naya account ka naam">
@@ -476,6 +484,7 @@ tfoot td{border-bottom:none;border-top:2px solid var(--orange);}
       <div class="topbar">
         <h1 id="accDetailTitle">Account</h1>
         <button class="printBtn" onclick="window.print()">🖨️ Print</button>
+        <button class="imgBtn noPrint" onclick="saveAsImage('page-accountDetail', this)">🖼️ Picture Save Karen</button>
       </div>
       <button class="backBtn noPrint" onclick="goPage('accounts')">← Wapas Account List</button>
       <div class="tblWrap">
@@ -491,6 +500,7 @@ tfoot td{border-bottom:none;border-top:2px solid var(--orange);}
       <div class="topbar">
         <h1>Summary — Sare Accounts</h1>
         <button class="printBtn noPrint" onclick="printSummarySelected()">🖨️ Print</button>
+        <button class="imgBtn noPrint" onclick="saveSummaryAsImage(this)">🖼️ Picture Save Karen</button>
       </div>
       <div class="cards">
         <div class="card credit"><h3>Total Jama</h3><div class="val" id="summaryCredit">0</div></div>
@@ -954,6 +964,79 @@ function goPage(page, accName){
     if(page==='settings') updateSettingsUI();
   }
   updatePrintHeader();
+}
+
+/* ================= SAVE AS PICTURE (sharp PNG, blur-free) ================= */
+/* Print view ko screenshot lene se blur aata hai (page scaled/zoomed hoti hai).
+   Ye function usi print-layout ko ek alag offscreen wrapper mein clone karke,
+   html2canvas se high-resolution (scale 3) PNG banata hai - koi blur nahi. */
+function saveAsImage(pageId, btnEl){
+  const original = document.getElementById(pageId);
+  if(!original){ alert('Page nahi mila.'); return; }
+  if(typeof html2canvas === 'undefined'){
+    alert('Image save library load nahi hui. Internet check karen aur dobara try karen.');
+    return;
+  }
+  if(btnEl){ btnEl.disabled = true; btnEl.textContent = '⏳ Ban raha hai...'; }
+  updatePrintHeader();
+
+  const wrapper = document.createElement('div');
+  wrapper.style.position = 'fixed';
+  wrapper.style.left = '-99999px';
+  wrapper.style.top = '0';
+  wrapper.style.background = '#ffffff';
+  wrapper.style.padding = '24px';
+  wrapper.style.width = Math.max(original.offsetWidth, 700) + 'px';
+  wrapper.style.fontFamily = getComputedStyle(document.body).fontFamily;
+
+  const headerSrc = document.querySelector('.printHeader');
+  if(headerSrc){
+    const headerClone = headerSrc.cloneNode(true);
+    headerClone.style.display = 'block';
+    headerClone.style.textAlign = 'center';
+    headerClone.style.marginBottom = '16px';
+    headerClone.style.paddingBottom = '12px';
+    headerClone.style.borderBottom = '3px solid #000';
+    wrapper.appendChild(headerClone);
+  }
+
+  const pageClone = original.cloneNode(true);
+  pageClone.classList.remove('hidden');
+  pageClone.querySelectorAll('.noPrint').forEach(function(el){ el.remove(); });
+  pageClone.querySelectorAll('input, select, textarea').forEach(function(el){ el.remove(); });
+  wrapper.appendChild(pageClone);
+
+  document.body.appendChild(wrapper);
+
+  html2canvas(wrapper, {scale: 3, backgroundColor: '#ffffff', useCORS: true}).then(function(canvas){
+    document.body.removeChild(wrapper);
+    if(btnEl){ btnEl.disabled = false; btnEl.textContent = '🖼️ Picture Save Karen'; }
+    const link = document.createElement('a');
+    const safeName = (pageId || 'page').replace('page-', '');
+    link.download = safeName + '_' + Date.now() + '.png';
+    link.href = canvas.toDataURL('image/png');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }).catch(function(err){
+    if(document.body.contains(wrapper)) document.body.removeChild(wrapper);
+    if(btnEl){ btnEl.disabled = false; btnEl.textContent = '🖼️ Picture Save Karen'; }
+    alert('Picture save nahi ho saki: ' + err.message);
+  });
+}
+
+/* Summary page ke liye - pehle selected sections ka filter apply karta hai, phir image banata hai. */
+function saveSummaryAsImage(btnEl){
+  const wantJama = document.getElementById('printChkJama').checked;
+  const wantPersonal = document.getElementById('printChkPersonal').checked;
+  const wantBaqaya = document.getElementById('printChkBaqaya').checked;
+  if(!wantJama && !wantPersonal && !wantBaqaya){
+    alert('Kam az kam ek section select karen jo picture mein chahiye.');
+    return;
+  }
+  _summaryPrintFilter = {jama:wantJama, personal:wantPersonal, baqaya:wantBaqaya};
+  renderSummary();
+  saveAsImage('page-summary', btnEl);
 }
 
 /* ================= PRINT HEADER ================= */
