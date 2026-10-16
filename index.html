@@ -325,6 +325,7 @@ tfoot td{border-bottom:none;border-top:2px solid var(--orange);}
 
 <!-- ===================== MAIN APP ===================== -->
 <div id="app" class="hidden">
+  <div id="fbLoading" class="hidden" style="position:fixed;inset:0;z-index:9999;background:rgba(255,255,255,.96);display:flex;align-items:center;justify-content:center;text-align:center;padding:24px;font-size:16px;"><div>⏳ Cloud se data load ho raha hai...<br><small>Jab tak load na ho, entry/edit band hai taake purana data cloud ko overwrite na kare.<br>Agar der lage to internet check karen ya <a href="#" onclick="location.reload();return false;">Reload</a> karen.</small></div></div>
   <div id="fbSyncError" class="hidden" style="position:fixed;top:0;left:0;right:0;z-index:10000;background:var(--debit);color:#fff;padding:10px 16px;font-size:13.5px;text-align:center;"></div>
   <button id="floatingLogoutBtn" class="noPrint" onclick="doLogout()" title="Logout">⏻ Logout</button>
   <div id="sidebar">
@@ -576,6 +577,11 @@ tfoot td{border-bottom:none;border-top:2px solid var(--orange);}
           <button onclick="exportBackup()">⬇️ Backup Download</button>
         </div>
         <div class="field">
+          <label>Auto Backups (is device par, roz ka aakhri 5 din)</label><br><br>
+          <select id="autoBakSel"></select>
+          <button onclick="downloadAutoBackup()">⬇️ Download</button>
+        </div>
+        <div class="field">
           <label>Restore (Purana Backup Upload Karen)</label><br><br>
           <label class="fileLbl">📁 File Chunen
             <input type="file" id="restoreFile" accept=".json" class="hidden" onchange="importBackup(event)">
@@ -632,6 +638,7 @@ function isFirebaseConfigured(){
 /* Firebase state */
 let fbApp = null, fbAuth = null, fbDB = null;
 let isFirebaseMode = false;
+let cloudReady = false, cloudBase = null, pendingPushes = 0, pushChain = Promise.resolve();
 let applyingRemoteSnapshot = false;
 let firebaseSessionStarted = false;
 let unsubscribeSnapshot = null;
@@ -664,10 +671,107 @@ function loadData(){
   return defaultData();
 }
 function saveData(){
+  if(isFirebaseMode && !cloudReady){
+    alert('Cloud se data abhi load nahi hua. Save nahi hua — thori dair baad dobara koshish karen.');
+    return;
+  }
   localStorage.setItem(LS_KEY, JSON.stringify(DATA));
   if(isFirebaseMode && fbDB && !applyingRemoteSnapshot){
-    fbDB.collection('shopdata').doc('main').set(DATA).catch(function(err){ console.error('Firebase save error', err); });
+    pendingPushes++;
+    pushChain = pushChain.then(pushToCloud).catch(function(){}).then(function(){ pendingPushes--; });
   }
+}
+/* ---- Merge-safe cloud sync: sirf APNI tabdeeliyan (base ke muqable) cloud ke taaza data par lagti hain ---- */
+function diffArr(base, cur){
+  const bm = new Map((base||[]).map(function(x){ return [x.id, JSON.stringify(x)]; }));
+  const cm = new Map((cur||[]).map(function(x){ return [x.id, x]; }));
+  const up = [], rem = [];
+  cm.forEach(function(v,id){ if(bm.get(id) !== JSON.stringify(v)) up.push(v); });
+  bm.forEach(function(_,id){ if(!cm.has(id)) rem.push(id); });
+  return {up:up, rem:rem};
+}
+function applyDiff(arr, d){
+  const m = new Map((arr||[]).map(function(x){ return [x.id, x]; }));
+  d.up.forEach(function(x){ m.set(x.id, x); });
+  d.rem.forEach(function(id){ m.delete(id); });
+  return Array.from(m.values());
+}
+function mergeData(base, mine, remote){
+  base = base || {}; remote = remote || defaultData();
+  const out = JSON.parse(JSON.stringify(remote));
+  ['accounts','entries','openingBalances'].forEach(function(k){
+    out[k] = applyDiff(remote[k], diffArr(base[k], mine[k]));
+  });
+  ['settings','auth'].forEach(function(k){
+    out[k] = Object.assign({}, remote[k]||{});
+    const b = base[k]||{}, m = mine[k]||{};
+    Object.keys(m).forEach(function(f){ if(JSON.stringify(b[f]) !== JSON.stringify(m[f])) out[k][f] = m[f]; });
+  });
+  return out;
+}
+function applyRemote(remote){
+  applyingRemoteSnapshot = true;
+  DATA = JSON.parse(JSON.stringify(remote));
+  if(!DATA.settings) DATA.settings = {};
+  if(!DATA.openingBalances) DATA.openingBalances = [];
+  if(!DATA.accounts) DATA.accounts = [];
+  if(!DATA.entries) DATA.entries = [];
+  if(!DATA.auth) DATA.auth = {passwordHash:null};
+  localStorage.setItem(LS_KEY, JSON.stringify(DATA));
+  autoBackup();
+  if(!document.getElementById('app').classList.contains('hidden')){
+    renderAll(); updatePrintHeader(); updateSettingsUI();
+  }
+  applyingRemoteSnapshot = false;
+}
+function setCloudReady(){
+  cloudReady = true;
+  const o = document.getElementById('fbLoading'); if(o) o.classList.add('hidden');
+}
+function pushToCloud(){
+  const ref = fbDB.collection('shopdata').doc('main');
+  const base = cloudBase ? JSON.parse(cloudBase) : null;
+  const mine = JSON.parse(JSON.stringify(DATA));
+  return fbDB.runTransaction(function(tx){
+    return tx.get(ref).then(function(snap){
+      const merged = mergeData(base, mine, snap.exists ? snap.data() : null);
+      tx.set(ref, merged);
+      return merged;
+    });
+  }).then(function(merged){
+    cloudBase = JSON.stringify(merged);
+    if(pendingPushes <= 1) applyRemote(merged);
+  }).catch(function(err){
+    console.error('Cloud save error', err);
+    showFbSyncError('Cloud par save NAHI hua: ' + err.message + ' — internet check karen, phir dobara save karen.');
+    alert('Cloud par save nahi hua. Internet check karen aur dobara koshish karen.');
+  });
+}
+/* ---- Roz ka automatic backup (is device mein, aakhri 5 din) ---- */
+function autoBackup(){
+  try{
+    const key = 'fb_autobak_' + todayStr();
+    if(localStorage.getItem(key) || !DATA.entries.length) return;
+    localStorage.setItem(key, JSON.stringify(DATA));
+    Object.keys(localStorage).filter(function(k){ return k.indexOf('fb_autobak_')===0; }).sort().slice(0,-5)
+      .forEach(function(k){ localStorage.removeItem(k); });
+  }catch(e){ console.error('autoBackup', e); }
+}
+function downloadAutoBackup(){
+  const sel = document.getElementById('autoBakSel'); if(!sel || !sel.value){ alert('Koi auto backup nahi mila.'); return; }
+  const raw = localStorage.getItem(sel.value); if(!raw) return;
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([raw], {type:'application/json'}));
+  a.download = 'FarmanBrother_AutoBackup_' + sel.value.replace('fb_autobak_','') + '.json';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+}
+function refreshAutoBakList(){
+  const sel = document.getElementById('autoBakSel'); if(!sel) return;
+  const keys = Object.keys(localStorage).filter(function(k){ return k.indexOf('fb_autobak_')===0; }).sort().reverse();
+  sel.innerHTML = keys.map(function(k){
+    let n = ''; try{ n = ' (' + JSON.parse(localStorage.getItem(k)).entries.length + ' entries)'; }catch(e){}
+    return '<option value="'+k+'">'+k.replace('fb_autobak_','')+n+'</option>';
+  }).join('');
 }
 function uid(){ return 'id_' + Date.now() + '_' + Math.random().toString(36).slice(2,8); }
 function simpleHash(str){
@@ -828,26 +932,17 @@ function startFirebaseSession(){
   const docRef = fbDB.collection('shopdata').doc('main');
   unsubscribeSnapshot = docRef.onSnapshot(function(snap){
     hideFbSyncError();
+    if(pendingPushes > 0) return; /* apna save chal raha hai — us ke baad data khud update hoga */
     if(snap.exists){
       const remote = snap.data();
       if(remote && remote.entries !== undefined){
-        applyingRemoteSnapshot = true;
-        DATA = remote;
-        if(!DATA.settings) DATA.settings = {};
-        if(!DATA.openingBalances) DATA.openingBalances = [];
-        if(!DATA.accounts) DATA.accounts = [];
-        if(!DATA.entries) DATA.entries = [];
-        if(!DATA.auth) DATA.auth = {passwordHash:null};
-        localStorage.setItem(LS_KEY, JSON.stringify(DATA));
-        if(!document.getElementById('app').classList.contains('hidden')){
-          renderAll();
-          updatePrintHeader();
-          updateSettingsUI();
-        }
-        applyingRemoteSnapshot = false;
+        cloudBase = JSON.stringify(remote);
+        applyRemote(remote);
+        setCloudReady();
       }
     } else {
-      docRef.set(DATA).catch(function(err){ console.error('Initial Firestore write error', err); });
+      docRef.set(DATA).then(function(){ cloudBase = JSON.stringify(DATA); setCloudReady(); })
+        .catch(function(err){ console.error('Initial Firestore write error', err); });
     }
   }, function(err){
     console.error('Snapshot error', err);
@@ -863,6 +958,7 @@ function startFirebaseSession(){
 }
 
 function updateSettingsUI(){
+  refreshAutoBakList();
   const localBlock = document.getElementById('localPasswordBlock');
   const localBtn = document.getElementById('localPasswordBtn');
   const localHr = document.getElementById('localPasswordHr');
@@ -942,11 +1038,12 @@ function resetAllConfirm(){
       DATA = defaultData();
       localStorage.removeItem(LS_KEY);
       saveData();
-      location.reload();
+      pushChain.then(function(){ location.reload(); });
     }
   }
 }
 function enterApp(){
+  if(isFirebaseMode && !cloudReady){ const o=document.getElementById('fbLoading'); if(o) o.classList.remove('hidden'); }
   document.getElementById('loginScreen').classList.add('hidden');
   document.getElementById('app').classList.remove('hidden');
   document.getElementById('sbBrandName').textContent = DATA.settings.businessName;
@@ -1789,13 +1886,20 @@ function importBackup(evt){
         alert('Yeh file valid backup nahi hai.');
         return;
       }
-      if(!confirm('Restore karne se mojooda data replace ho jayega. Aage badhein?')) return;
-      DATA = imported;
-      if(!DATA.auth) DATA.auth = {passwordHash:null};
-      if(!DATA.openingBalances) DATA.openingBalances = [];
+      exportBackup(); /* pehle mojooda data ka backup khud download ho jata hai */
+      if(confirm('Backup ko mojooda data mein MERGE karen?\n\nOK = merge (mojooda data mehfooz rahega, backup ki missing entries add hongi)\nCancel = aage REPLACE ka option')){
+        ['accounts','entries','openingBalances'].forEach(function(k){
+          const have = new Set((DATA[k]||[]).map(function(x){ return x.id; }));
+          (imported[k]||[]).forEach(function(x){ if(!have.has(x.id)) DATA[k].push(x); });
+        });
+      } else {
+        if(!confirm('REPLACE: backup mein jo nahi hai wo SAB DELETE ho jayega (cloud se bhi). Pakka?')) return;
+        DATA = imported;
+        if(!DATA.auth) DATA.auth = {passwordHash:null};
+        if(!DATA.openingBalances) DATA.openingBalances = [];
+      }
       saveData();
-      alert('Backup restore ho gaya!');
-      location.reload();
+      pushChain.then(function(){ alert('Backup restore ho gaya!'); location.reload(); });
     }catch(err){
       alert('File parhne mein masla hua: ' + err.message);
     }
