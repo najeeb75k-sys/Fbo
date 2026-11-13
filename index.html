@@ -312,11 +312,8 @@ tfoot td{border-bottom:none;border-top:2px solid var(--orange);}
       <input type="password" id="fbLoginPass" placeholder="Password" onkeydown="if(event.key==='Enter')doFirebaseLogin()">
       <button onclick="doFirebaseLogin()">Login</button>
       <div class="orDivider"><span>ya</span></div>
-      <button class="googleBtn" onclick="doGoogleLogin()">
-        <svg width="18" height="18" viewBox="0 0 48 48" style="vertical-align:middle;margin-right:8px;"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.1 8 3l6-6C34.5 5.1 29.5 3 24 3 12.4 3 3 12.4 3 24s9.4 21 21 21 21-9.4 21-21c0-1.4-.1-2.7-.4-4z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.6 15.3 18.9 12 24 12c3.1 0 5.8 1.1 8 3l6-6C34.5 5.1 29.5 3 24 3 16.3 3 9.7 7.4 6.3 14.7z"/><path fill="#4CAF50" d="M24 45c5.4 0 10.3-2.1 14-5.5l-6.5-5.4C29.4 35.9 26.8 37 24 37c-5.3 0-9.7-3.3-11.3-8l-6.6 5.1C9.6 40.5 16.2 45 24 45z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.3-2.3 4.2-4.2 5.6l6.5 5.4C41.4 35.9 45 30.5 45 24c0-1.4-.1-2.7-.4-4z"/></svg>
-        Google Se Login Karen
-      </button>
-      <div id="gsiButtonContainer" style="position:absolute;top:-9999px;left:-9999px;"></div>
+      <div id="gsiButtonContainer" style="display:flex;justify-content:center;min-height:44px;"></div>
+      <div id="gsiStatus" style="font-size:12px;color:#999;margin-top:6px;">Google button load ho raha hai...</div>
       <span class="forgotLink" onclick="switchToLocalMode()">Firebase mein masla? (Local mode par jayen)</span>
     </div>
     <div class="loginMsg" id="loginMsg"></div>
@@ -837,8 +834,10 @@ function handleGoogleCredentialResponse(response){
   fbAuth.signInWithCredential(credential).catch(googleLoginError);
 }
 
+let gsiTries=0;
 function initGoogleSignIn(){
   if(gsiInitAttempted) return;
+  if(++gsiTries>40){ const st=document.getElementById('gsiStatus'); if(st){ st.style.color='#c0392b'; st.textContent='Google script load nahi hui (internet/VPN/adblock check karen). Email+password se login karen.'; } return; }
   if(typeof google === 'undefined' || !google.accounts || !google.accounts.id){
     setTimeout(initGoogleSignIn, 300);
     return;
@@ -850,7 +849,8 @@ function initGoogleSignIn(){
   });
   const container = document.getElementById('gsiButtonContainer');
   if(container){
-    google.accounts.id.renderButton(container, {theme:'outline', size:'large', width:300});
+    google.accounts.id.renderButton(container, {theme:'outline', size:'large', width:Math.min(280, (container.parentElement.clientWidth||280)), text:'signin_with'});
+    const st=document.getElementById('gsiStatus'); if(st) st.style.display='none';
   }
   gsiReady = true;
   /* Agar user ne button dabaya tha jabke library abhi load ho rahi thi,
@@ -877,29 +877,8 @@ function googleLoginError(err){
 function doGoogleLogin(){
   const msg = document.getElementById('loginMsg');
   if(!fbAuth){ msg.className='loginMsg err'; msg.textContent='Firebase load nahi hua. Internet check karen.'; return; }
-  if(!gsiReady){
-    msg.className='loginMsg';
-    msg.textContent='Google Sign-In tayyar ho raha hai, ek second...';
-    pendingGoogleLogin = true;
-    initGoogleSignIn();
-    return;
-  }
-  /* Humara apna orange button asal Google button (jo screen se bahar chupa hai)
-     ko trigger karta hai — is se Google ka official, reliable token-based
-     sign-in flow chalta hai (koi popup/redirect cross-domain masla nahi). */
-  const realBtn = document.querySelector('#gsiButtonContainer div[role="button"]');
-  if(realBtn){
-    realBtn.click();
-  } else {
-    // Button abhi render ho raha hai — thori dair mein khud dobara try karte hain
-    msg.className='loginMsg';
-    msg.textContent='Google Sign-In tayyar ho raha hai, ek second...';
-    setTimeout(function(){
-      const retryBtn = document.querySelector('#gsiButtonContainer div[role="button"]');
-      if(retryBtn){ retryBtn.click(); }
-      else { msg.className='loginMsg err'; msg.textContent='Internet dheema hai. Dobara "Google Se Login Karen" dabayen.'; }
-    }, 800);
-  }
+  msg.className='loginMsg err';
+  msg.textContent='Upar wala Google ka button dabayen.';
 }
 
 function switchToLocalMode(){
